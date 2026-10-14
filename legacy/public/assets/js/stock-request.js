@@ -10,7 +10,25 @@
 
   const cart = new Map();
   const money = (value) => 'Rp ' + Number(value || 0).toLocaleString('id-ID');
-  const esc = (s) => String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]));
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+
+  // V17.0.12: sync stok gudang di daftar produk ala POS — berkurang sesuai qty keranjang
+  function syncListStock() {
+    list.querySelectorAll('.request-product-row').forEach(row => {
+      const key = Number(row.dataset.productId) + ':' + Number(row.dataset.variantId || 0);
+      const original = Number(row.dataset.stock || 0);
+      const inCart = (cart.get(key)?.qty) || 0;
+      const sisa = Math.max(0, original - inCart);
+      const pill = row.querySelector('.stock-pill');
+      const addBtn = row.querySelector('.request-add-btn');
+      if (pill) {
+        pill.textContent = 'Gudang ' + sisa + ' ' + (row.dataset.unit || 'pcs');
+        pill.classList.toggle('out', sisa <= 0);
+        pill.classList.toggle('ok', sisa > 0);
+      }
+      if (addBtn) addBtn.disabled = sisa <= 0;
+    });
+  }
 
   function render() {
     const items = [...cart.values()];
@@ -20,15 +38,16 @@
     submit.disabled = items.length === 0;
     if (!items.length) {
       cartEl.innerHTML = '<div class="request-empty"><i class="bi bi-cart-plus"></i><b>Belum ada barang</b><span>Pilih produk dari daftar gudang.</span></div>';
-      return;
-    }
-    cartEl.innerHTML = items.map(i => `
+    } else {
+      cartEl.innerHTML = items.map(i => `
       <div class="request-cart-item" data-id="${i.key}">
-        <div><small>${esc(i.code)}</small><b>${esc(i.name)}</b><span>${money(i.cost)} / ${esc(i.unit)} • stok gudang ${i.stock}</span></div>
+        <div><small>${esc(i.code)}</small><b>${esc(i.name)}</b><span>${money(i.cost)} / ${esc(i.unit)} • sisa gudang ${Math.max(0, i.stock - i.qty)}</span></div>
         <div class="request-qty"><button type="button" data-act="minus"><i class="bi bi-dash"></i></button><input type="number" min="1" max="${i.stock}" value="${i.qty}" data-act="qty"><button type="button" data-act="plus"><i class="bi bi-plus"></i></button></div>
         <strong>${money(i.qty * i.cost)}</strong>
         <button type="button" class="request-remove" data-act="remove"><i class="bi bi-trash"></i></button>
       </div>`).join('');
+    }
+    syncListStock();
   }
 
   list.addEventListener('click', (e) => {

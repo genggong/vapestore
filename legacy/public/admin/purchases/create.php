@@ -144,39 +144,56 @@ if (is_post()) {
         foreach ($items as $item) {
             $cache=$productCache[$item['product_id'].':'.$item['variant_id']];$product=$cache['product'];$variant=$cache['variant'];$variantId=(int)$item['variant_id'];$variantName=$variant['name']??null;$variantSku=$variant['sku']??null;
             $lineTotal = (int)$item['qty'] * (float)$item['price'];
+            $qty=(int)$item['qty'];$newPrice=(float)$item['price'];
             $before = 0;
-            $after = 0;
+            $oldPrice = (float)($variant && (float)$variant['purchase_price']>0 ? $variant['purchase_price'] : $product['purchase_price']);
 
-            // Harga modal produk/varian mengikuti harga beli supplier terakhir.
-            // Produk induk tetap menyimpan fallback HPP, sedangkan varian menyimpan HPP spesifik.
-            $db->prepare("UPDATE products SET purchase_price=?, updated_at=NOW() WHERE id=?")->execute([$item['price'], $item['product_id']]);
+            // Ambil stok & HPP lama di tujuan untuk menghitung HPP rata-rata tertimbang
+            if ($destinationType === 'warehouse') {
+                if($variantId>0){
+                    $ws=warehouse_variant_stock($db,$destinationId,(int)$item['product_id'],$variantId,true);$before=(int)$ws['stock'];
+                    if((float)($ws['purchase_price']??0)>0)$oldPrice=(float)$ws['purchase_price'];
+                } else {
+                    $ws=warehouse_stock($db,$destinationId,(int)$item['product_id'],true);$before=(int)$ws['stock'];
+                    if((float)($ws['purchase_price']??0)>0)$oldPrice=(float)$ws['purchase_price'];
+                }
+            } else {
+                if($variantId>0){
+                    $before=marketplace_v16_variant_stock($db,$variantId,$destinationId,true);
+                } else {
+                    branch_sync_product($db,(int)$item['product_id']);$bs=branch_stock($db,$destinationId,(int)$item['product_id']);$before=(int)$bs['stock'];
+                }
+            }
+            $after=$before+$qty;
+            // V17.0.12: HPP rata-rata tertimbang (stok lama x harga lama + qty x harga baru) / total stok
+            $avgPrice = avg_hpp((float)$before, $oldPrice, (float)$qty, $newPrice);
+
+            // Update master HPP (produk induk & varian) dengan harga rata-rata
+            $db->prepare("UPDATE products SET purchase_price=?, updated_at=NOW() WHERE id=?")->execute([$avgPrice, $item['product_id']]);
             if ($variantId > 0) {
                 $db->prepare("UPDATE marketplace_product_variants SET purchase_price=?, updated_at=NOW() WHERE id=? AND product_id=?")
-                    ->execute([$item['price'], $variantId, $item['product_id']]);
+                    ->execute([$avgPrice, $variantId, $item['product_id']]);
             }
 
             if ($destinationType === 'warehouse') {
                 if($variantId>0){
-                    $ws=warehouse_variant_stock($db,$destinationId,(int)$item['product_id'],$variantId,true);$before=(int)$ws['stock'];$after=$before+(int)$item['qty'];
-                    warehouse_set_variant_stock($db,$destinationId,(int)$item['product_id'],$variantId,$after,(float)$item['price'],(int)($ws['minimum_stock']??0));
+                    warehouse_set_variant_stock($db,$destinationId,(int)$item['product_id'],$variantId,$after,$avgPrice,(int)($ws['minimum_stock']??0));
                 } else {
-                    $ws = warehouse_stock($db, $destinationId, (int)$item['product_id'], true);$before=(int)$ws['stock'];$after=$before+(int)$item['qty'];
-                    $db->prepare("UPDATE warehouse_stocks SET stock=?,purchase_price=?,minimum_stock=?,updated_at=NOW() WHERE warehouse_id=? AND product_id=?")->execute([$after,$item['price'],(int)$product['minimum_stock'],$destinationId,$item['product_id']]);
+                    $db->prepare("UPDATE warehouse_stocks SET stock=?,purchase_price=?,minimum_stock=?,updated_at=NOW() WHERE warehouse_id=? AND product_id=?")->execute([$after,$avgPrice,(int)$product['minimum_stock'],$destinationId,$item['product_id']]);
                 }
-                warehouse_record_movement($db,$destinationId,(int)$item['product_id'],'supplier_purchase_in',(int)$item['qty'],$before,$after,(float)$item['price'],'purchase',$purchaseId,'Pembelian supplier '.$purchaseNumber.($variantName?' • '.$variantName:''));
+                warehouse_record_movement($db,$destinationId,(int)$item['product_id'],'supplier_purchase_in',$qty,$before,$after,$avgPrice,'purchase',$purchaseId,'Pembelian supplier '.$purchaseNumber.($variantName?' • '.$variantName:''));
             } else {
                 if($variantId>0){
-                    $before=marketplace_v16_variant_stock($db,$variantId,$destinationId,true);$after=$before+(int)$item['qty'];marketplace_v16_set_variant_stock($db,$variantId,$destinationId,$after,0);marketplace_v16_sync_parent_stock($db,(int)$item['product_id'],$destinationId);
+                    marketplace_v16_set_variant_stock($db,$variantId,$destinationId,$after,0);marketplace_v16_sync_parent_stock($db,(int)$item['product_id'],$destinationId);
                 } else {
-                    branch_sync_product($db,(int)$item['product_id']);$bs=branch_stock($db,$destinationId,(int)$item['product_id']);$before=(int)$bs['stock'];$after=$before+(int)$item['qty'];
                     $db->prepare("UPDATE product_branch_stocks SET stock=?,minimum_stock=?,updated_at=NOW() WHERE branch_id=? AND product_id=?")->execute([$after,(int)$product['minimum_stock'],$destinationId,$item['product_id']]);
                     $mainStmt=$db->prepare("SELECT is_main FROM branches WHERE id=? LIMIT 1");$mainStmt->execute([$destinationId]);if((int)$mainStmt->fetchColumn()===1)$db->prepare("UPDATE products SET stock=?,updated_at=NOW() WHERE id=?")->execute([$after,$item['product_id']]);
                 }
-                $db->prepare("INSERT INTO stock_movements (product_id,user_id,branch_id,type,qty,stock_before,stock_after,reference_type,reference_id,note) VALUES (?,?,?,?,?,?,?,?,?,?)")->execute([$item['product_id'],Auth::id(),$destinationId,'stock_in',$item['qty'],$before,$after,'purchase',$purchaseId,'Pembelian supplier '.$purchaseNumber.($variantName?' • '.$variantName:'')]);
+                $db->prepare("INSERT INTO stock_movements (product_id,user_id,branch_id,type,qty,stock_before,stock_after,reference_type,reference_id,note) VALUES (?,?,?,?,?,?,?,?,?,?)")->execute([$item['product_id'],Auth::id(),$destinationId,'stock_in',$qty,$before,$after,'purchase',$purchaseId,'Pembelian supplier '.$purchaseNumber.($variantName?' • '.$variantName:'')]);
             }
 
             $db->prepare("INSERT INTO purchase_items (purchase_id,product_id,variant_id,product_name,variant_name,variant_sku,product_code,unit,qty,purchase_price,line_total,stock_before,stock_after) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute([$purchaseId,$item['product_id'],$variantId?:null,$product['name'],$variantName,$variantSku,$variantSku?:$product['product_code'],$product['unit'],$item['qty'],$item['price'],$lineTotal,$before,$after]);
+                ->execute([$purchaseId,$item['product_id'],$variantId?:null,$product['name'],$variantName,$variantSku,$variantSku?:$product['product_code'],$product['unit'],$qty,$newPrice,$lineTotal,$before,$after]);
         }
 
         if ($paidAmount > 0) {

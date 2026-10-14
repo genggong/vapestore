@@ -76,10 +76,18 @@ try {
             warehouse_set_variant_stock($db,(int)$request['warehouse_id'],$productId,$variantId,$warehouseAfter,(float)$item['unit_cost'],(int)($ws['minimum_stock']??0));
             $branchBefore=marketplace_v16_variant_stock($db,$variantId,(int)$request['branch_id'],true);$branchAfter=$branchBefore+$qty;
             marketplace_v16_set_variant_stock($db,$variantId,(int)$request['branch_id'],$branchAfter,0);marketplace_v16_sync_parent_stock($db,$productId,(int)$request['branch_id']);
+            // V17.0.12: HPP varian rata-rata tertimbang saat stok request masuk
+            $vh=$db->prepare("SELECT purchase_price FROM marketplace_product_variants WHERE id=? LIMIT 1");$vh->execute([$variantId]);$vHpp=(float)$vh->fetchColumn();
+            $avgV=($vHpp>0&&$branchBefore>0)?round(($branchBefore*$vHpp+$qty*(float)$item['unit_cost'])/($branchBefore+$qty),2):(float)$item['unit_cost'];
+            if($avgV>0)$db->prepare("UPDATE marketplace_product_variants SET purchase_price=?,updated_at=NOW() WHERE id=?" )->execute([$avgV,$variantId]);
         }else{
             $db->prepare("UPDATE warehouse_stocks SET stock=?,updated_at=NOW() WHERE warehouse_id=? AND product_id=?")->execute([$warehouseAfter,(int)$request['warehouse_id'],$productId]);
             $db->prepare("UPDATE product_branch_stocks SET stock=?,updated_at=NOW() WHERE branch_id=? AND product_id=?")->execute([$branchAfter,(int)$request['branch_id'],$productId]);
             if($targetIsMain)$db->prepare("UPDATE products SET stock=?,updated_at=NOW() WHERE id=?")->execute([$branchAfter,$productId]);
+            // V17.0.12: HPP produk rata-rata tertimbang saat stok request masuk
+            $ph=$db->prepare("SELECT purchase_price FROM products WHERE id=? LIMIT 1");$ph->execute([$productId]);$pHpp=(float)$ph->fetchColumn();
+            $avgP=($pHpp>0&&$branchBefore>0)?round(($branchBefore*$pHpp+$qty*(float)$item['unit_cost'])/($branchBefore+$qty),2):(float)$item['unit_cost'];
+            if($avgP>0)$db->prepare("UPDATE products SET purchase_price=?,updated_at=NOW() WHERE id=?" )->execute([$avgP,$productId]);
         }
 
         warehouse_record_movement($db,(int)$request['warehouse_id'],$productId,'branch_request_out',$qty,$warehouseBefore,$warehouseAfter,(float)$item['unit_cost'],'stock_request',$id,'Kirim ke '.branch_name($db,(int)$request['branch_id']).' • '.$request['request_number']);
