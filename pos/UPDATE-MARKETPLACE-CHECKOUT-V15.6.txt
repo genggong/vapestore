@@ -1,0 +1,12 @@
+VAPEKONG MARKETPLACE V15.6
+
+Perbaikan:
+- UI Cara Menerima Pesanan dirapikan khusus mobile.
+- Cache storefront dinaikkan ke v15.6 agar CSS V15.5 tidak tertahan cache lama.
+- Request wilayah RajaOngkir dibuat single-flight dan di-cache di browser selama halaman aktif.
+- Retry otomatis untuk respons 429/terlalu cepat.
+- Throttle internal region-options yang menyebabkan false 429 dihapus.
+- Pesan error tidak lagi dimasukkan sebagai option Provinsi.
+- Tap ulang Provinsi dapat mencoba ulang bila jaringan/API sempat gagal.
+
+Tidak ada perubahan database.

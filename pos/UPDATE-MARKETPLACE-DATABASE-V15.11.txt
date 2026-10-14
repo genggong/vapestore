@@ -1,0 +1,14 @@
+V15.11 - Database Doctor Detection Fix
+
+Masalah yang diperbaiki:
+- V15.10 dapat menampilkan semua tabel sebagai PERLU UPGRADE / BELUM ADA walaupun tabel nyata sudah ada.
+- Penyebabnya scanner lama menggunakan prepared SHOW TABLES LIKE ? / SHOW COLUMNS LIKE ? yang tidak kompatibel pada sebagian MySQL/MariaDB shared hosting.
+
+Perbaikan:
+- Deteksi tabel, kolom, dan index menggunakan information_schema pada DATABASE() aktif.
+- Fallback query read-only jika information_schema dibatasi hosting.
+- Setelah tombol Cek & Upgrade Database dijalankan, schema langsung diverifikasi ulang dari koneksi yang sama.
+- Halaman dibuat no-cache agar hasil lama tidak tersimpan browser/proxy.
+- Ditambah indikator Tes koneksi dan Tabel products terbaca.
+
+Tidak ada SQL manual yang wajib dijalankan untuk fix scanner ini.

@@ -1,0 +1,20 @@
+VapeKong Marketplace V15.10 - Database Doctor + Brand/Variant Repair
+
+Fokus perbaikan:
+1. Tambah menu Admin > Sistem > Cek Database Marketplace.
+2. Menampilkan database aktif dan database pada config root /app dan /pos/app tanpa password.
+3. Memeriksa tabel/kolom Brand, metadata produk, galeri, opsi varian, nilai varian, kombinasi varian dan stok varian.
+4. Tombol Cek & Upgrade Database menambah tabel/kolom/index yang kurang tanpa menghapus produk/order.
+5. Brand duplikat tidak lagi menampilkan raw SQL 1062; sistem memberi pesan ramah dan mencegah duplikasi nama yang sama.
+6. Jika dua nama berbeda menghasilkan slug sama, sistem otomatis memakai suffix -2, -3, dst.
+7. Simpan Brand/Opsi/Nilai/Varian sekarang diverifikasi ulang dari database sebelum pesan sukses ditampilkan.
+8. Penyimpanan kombinasi varian memakai transaksi database. Jika stok/alokasi gagal, insert varian tidak tertinggal setengah jadi.
+9. Daftar varian tetap dapat membaca master varian walau tabel stok sedang rusak/kurang kolom, agar data tidak terlihat hilang.
+10. Daftar opsi tetap terbaca walau tabel nilai opsi belum sehat.
+
+Setelah upload:
+- Login admin.
+- Sistem > Cek Database Marketplace.
+- Periksa nama Database aktif, Config root /app, dan Config /pos/app.
+- Jika ada PERLU UPGRADE, tekan Cek & Upgrade Database.
+- Setelah semua schema produk berstatus OK, tes Brand > Produk Marketplace > Tipe Varian > Nilai > Kombinasi Varian.

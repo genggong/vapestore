@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# PHP
+*.log
+php-lint.log
+
+# Env & credentials
+.env
+.env.local
+*.sql
+
+# Vendor / build
+vendor/
+node_modules/
+
+# Uploads & data
+uploads/*
+!uploads/.gitkeep
+storage/logs/*
+!storage/logs/.gitkeep
+writable/cache/*
+writable/session/*
+writable/debugbar/*
+writable/logs/*
+writable/uploads/*

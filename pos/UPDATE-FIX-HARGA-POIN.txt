@@ -1,0 +1,14 @@
+VAPEKONG UPDATE - FIX HARGA & POIN NOTA
+Tanggal: 2026-09-03
+
+Perbaikan utama:
+1. Edit nama dan harga produk kembali dibuat jelas/terlihat dari menu Produk.
+2. Harga retail product_price_levels otomatis disinkronkan dengan products.selling_price.
+3. Edit/tambah/import produk sekarang langsung menyinkronkan harga retail POS.
+4. Keranjang localStorage direfresh dari data produk terbaru saat POS dibuka, sehingga nama/harga lama tidak tertahan di cache.
+5. Backend transaksi tetap menghitung ulang harga dari database; cart hanya mengirim ID/qty/type.
+6. Struk cetak menampilkan poin didapat / poin ditukar.
+7. Invoice WhatsApp menampilkan poin didapat / poin ditukar; transaksi pending menulis poin akan didapat setelah pembayaran sukses.
+8. Cart JSON sekarang mempertahankan tipe item agar paket/bundle tidak salah dianggap produk biasa.
+
+Catatan: transaksi lama tetap menyimpan snapshot harga saat transaksi tersebut dibuat. Harga baru berlaku untuk transaksi baru.

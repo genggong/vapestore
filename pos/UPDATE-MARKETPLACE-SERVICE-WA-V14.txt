@@ -1,0 +1,98 @@
+VAPEKONG POS + MARKETPLACE - V14
+Customer Service + Teknorilis WA Gateway
+=============================================
+
+PATCH INI KUMULATIF
+- Mencakup upgrade V10 Gudang/Request Stock
+- Mencakup V11 RajaOngkir + Pakasir v2
+- Mencakup V12 Marketplace Full + Shipping Delivery
+- Mencakup V13 Customer Marketplace
+- Menambah V14 Customer Service + WhatsApp Marketplace
+
+FITUR V14
+1. Teknorilis WA Gateway khusus Marketplace
+   Base URL: https://gateway.teknorilis.com/api/v1
+   - Bearer API Token
+   - Pilih Device dari API (tidak ketik ID manual)
+   - Test kirim WhatsApp
+   - Event notifikasi ON/OFF
+   - Antrean database + Idempotency-Key
+   - Retry otomatis max 5 kali
+   - Log terkirim/gagal
+   - Webhook incoming dengan verifikasi HMAC X-OpenWA-Signature
+
+2. Event WhatsApp customer
+   - Pesanan dibuat
+   - Instruksi pembayaran (opsional)
+   - Pembayaran berhasil
+   - Pesanan diproses
+   - Pesanan dikirim + resi
+   - Pesanan selesai
+   - Pesanan expired/dibatalkan
+   - Komplain/retur/refund dan balasan admin
+
+3. Customer Service Marketplace
+   Customer:
+   - Bantuan Pesanan
+   - Komplain
+   - Pembatalan + Refund
+   - Retur + Refund
+   - Chat customer-admin per kasus
+   - Konfirmasi barang diterima
+
+   Admin:
+   - Menu Layanan Marketplace
+   - Filter kasus/status
+   - Balas customer
+   - Approve/reject/resolve/close
+   - Catat nominal refund
+   - Metode refund
+   - Nomor referensi refund
+   - Reversal poin member saat refund diproses
+   - Stok dikembalikan untuk pembatalan paid yang refund-nya sudah diproses
+
+4. Refund Pakasir
+   Dokumentasi publik Pakasir API v2 saat patch ini dibuat belum mempublikasikan endpoint refund.
+   Patch TIDAK mengarang endpoint refund otomatis.
+   Refund paid order diproses oleh merchant, kemudian nominal/metode/referensinya dicatat di Layanan Marketplace.
+   Dengan cara ini stok, status, poin, timeline, dan audit refund tetap konsisten.
+
+CARA PASANG
+1. Backup file dan database.
+2. Upload ZIP V14 ke folder script.
+3. Extract + overwrite.
+4. Login admin -> Pengaturan Marketplace.
+5. Buka bagian WhatsApp Marketplace.
+6. Isi API Token dari gateway.teknorilis.com.
+7. Klik "Muat Device" lalu pilih device yang READY.
+8. Isi nomor Admin/CS bila ingin menerima notifikasi pengajuan customer.
+9. Pilih event WhatsApp yang aktif.
+10. Klik Simpan.
+11. Gunakan "Kirim Tes" untuk menguji koneksi.
+12. Pasang Cron Marketplace yang tampil di Pengaturan Marketplace.
+    Rekomendasi: setiap 1 menit. Maksimal 5 menit.
+13. Di dashboard Teknorilis WA Gateway, pasang:
+    - Webhook URL yang tampil di Pengaturan Marketplace
+    - Webhook Secret yang tampil di Pengaturan Marketplace
+
+DATABASE
+Normalnya tabel/kolom V14 dibuat otomatis oleh marketplace_install().
+Jika hosting memblokir ALTER/CREATE otomatis, jalankan sekali:
+  database/patches/patch-marketplace-service-wa-v14.sql
+
+MENU BARU
+Admin:
+- Transaksi -> Layanan Marketplace
+- Sistem -> WA Marketplace
+- Sistem -> Pengaturan Marketplace -> WhatsApp Marketplace
+
+Customer:
+- Bantuan Pesanan
+- Detail bantuan/chat
+- Konfirmasi barang diterima
+- Batalkan/Ajukan Refund dari detail order
+
+CATATAN
+- WhatsApp POS lama tidak diubah oleh V14. Integrasi Teknorilis ini khusus Marketplace agar setting POS dan Marketplace tetap terpisah.
+- Pengiriman WA tidak memblokir checkout/webhook. Pesan masuk queue dan diproses cron.
+- Jika device/API sedang bermasalah, transaksi marketplace tetap berjalan.

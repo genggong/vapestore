@@ -1,0 +1,34 @@
+VAPEKONG MARKETPLACE V15.5 - AMBIL DI TOKO / CLICK & COLLECT
+============================================================
+
+FITUR BARU
+- Checkout mempunyai pilihan Dikirim ke Alamat atau Ambil di Toko.
+- Ambil di Toko ongkir Rp0 dan tidak memakai RajaOngkir/Shipping Delivery.
+- Admin dapat mengaktifkan fitur, mengatur nama layanan, jam, instruksi, dan cabang pickup.
+- Hanya cabang yang memiliki stok lengkap seluruh isi keranjang yang ditampilkan kepada customer.
+- Cabang yang dipilih customer menjadi branch_id order dan stok dikurangi dari cabang tersebut.
+- Tetap melalui Picking -> Packing -> Siap Diambil.
+- Customer mendapatkan kode pengambilan 6 digit setelah pembayaran.
+- Admin wajib mencocokkan kode saat barang diserahkan.
+- Setelah kode benar: order otomatis Selesai dan waktu/nama penerima tercatat.
+- Tracking customer mempunyai timeline khusus Click & Collect.
+- Invoice menampilkan Pengambilan di Toko, bukan resi pengiriman.
+- Notifikasi WA dapat diaktifkan untuk event Pesanan Siap Diambil.
+
+CARA AKTIFKAN
+1. Upload patch dan overwrite file lama.
+2. Admin -> Pengaturan Marketplace.
+3. Buka bagian Ambil di Toko / Click & Collect.
+4. Ubah Status menjadi Aktif.
+5. Pilih cabang yang boleh dipilih customer.
+6. Isi jam dan instruksi pengambilan.
+7. Simpan.
+
+ALUR OPERASIONAL
+Customer checkout -> Ambil di Toko -> pilih cabang -> bayar QRIS/VA ->
+Picking -> Packing -> Siap Diambil -> customer datang membawa kode 6 digit ->
+admin verifikasi kode -> pesanan Selesai.
+
+DATABASE
+Auto migration dijalankan melalui marketplace_install(). Jika hosting menolak ALTER TABLE,
+import database/patches/patch-marketplace-store-pickup-v15_5.sql melalui phpMyAdmin.

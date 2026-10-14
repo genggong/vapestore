@@ -1,0 +1,44 @@
+VAPEKONG MARKETPLACE V11 - RAJAONGKIR + PAKASIR V2
+====================================================
+
+PATCH INI BERSIFAT KUMULATIF
+- Sudah termasuk update Gudang + Request Stock V10 sebelumnya.
+- Aman dipasang langsung di atas app (19).zip; jika V10 sudah dipasang, file terkait akan dioverwrite ke versi terbaru.
+
+FITUR UTAMA
+- Checkout marketplace real (bukan demo).
+- Produk, harga dan stok membaca master POS yang sama.
+- Fulfillment marketplace dapat memilih satu cabang aktif.
+- Stok cabang langsung di-reserve saat order dibuat untuk mencegah overselling POS vs marketplace.
+- Stok otomatis dikembalikan jika pembayaran expired/gagal/dibatalkan sebelum lunas.
+- RajaOngkir Shipping Cost API: pencarian tujuan + ongkir live berdasarkan berat produk.
+- Berat per produk (gram) dapat diatur dari Tambah/Edit Produk.
+- Pakasir API v2: QRIS dan Virtual Account.
+- Webhook pembayaran memperbarui status online order otomatis.
+- Halaman pembayaran QR/VA publik.
+- Admin > Pesanan Marketplace: Paid -> Processing -> Shipped + Resi -> Completed.
+- Tracking marketplace dapat dicari dengan nomor order atau nomor resi.
+- Cron expired order untuk melepas stok reserve walaupun pembeli tidak kembali ke halaman order.
+
+CARA SETTING
+1. Upload/extract patch dengan overwrite file yang sama.
+2. Backup database sebelum update.
+3. Buka Admin > Pengaturan. Tabel/kolom marketplace dibuat otomatis.
+   Alternatif manual: import database/patches/patch-marketplace-rajaongkir-pakasir-v11.sql
+4. Isi Pengaturan Marketplace Checkout & Pengiriman:
+   - Cabang Fulfillment Marketplace
+   - Berat Default Produk
+   - API Key RajaOngkir
+   - Kurir Aktif
+   Simpan API Key terlebih dahulu, buka kembali Pengaturan, lalu cari/pilih Lokasi Asal RajaOngkir dan simpan.
+5. Isi Slug Project + API Key Pakasir.
+6. Salin Webhook URL Pakasir lengkap beserta ?token=... dari Admin > Pengaturan ke dashboard proyek Pakasir.
+7. Pasang Cron Expired Marketplace dari URL yang tampil di Admin > Pengaturan. Rekomendasi setiap 5 menit.
+8. Edit berat produk agar ongkir akurat. Produk lama otomatis memiliki default 100 gram sampai diperbarui.
+
+CATATAN
+- Ongkir dan harga selalu dihitung ulang di server. Nilai harga/ongkir dari browser tidak dipercaya.
+- API Key RajaOngkir dan API Key Pakasir tidak ditampilkan ke halaman publik.
+- Patch ini menggunakan RajaOngkir Shipping Cost. Pembuatan pickup/booking kurir otomatis (Shipping Delivery) belum diaktifkan; resi saat ini diinput admin pada Pesanan Marketplace.
+- Jangan membatalkan order yang sudah LUNAS dari database. Order paid sengaja tidak dapat dibatalkan otomatis di UI karena refund payment gateway perlu alur terpisah.
+- Jika website dijalankan dari folder /pos, file versi /pos sudah disertakan juga.

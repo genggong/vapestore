@@ -1,0 +1,31 @@
+VAPEKONG MARKETPLACE PRODUCT REPAIR V15.7
+=========================================
+
+Masalah yang diperbaiki:
+- Edit produk POS gagal: Unknown column 'weight_gram'.
+- Pilih/Simpan brand Marketplace gagal: Unknown column 'brand_id'.
+- Brand yang sudah dibuat tidak dapat dipasang ke produk pada database lama.
+- Produk Marketplace tetap dapat memakai galeri, brand, varian, dan berat meskipun
+  tabel products lama tidak dapat di-ALTER oleh user database hosting.
+
+Penyebab:
+File aplikasi sudah versi Marketplace V15.x, tetapi schema database subdomain masih
+schema POS lama. Domain/subdomain aktif bersamaan bukan penyebab SQLSTATE 42S22.
+Jika domain utama normal tetapi subdomain error, cek apakah keduanya memakai database
+yang sama dan schema yang sama.
+
+Perbaikan V15.7:
+Marketplace memakai tabel kompatibilitas marketplace_product_meta sebagai penyimpanan
+brand_id dan weight_gram bila kolom tersebut tidak tersedia pada products. POS tidak
+lagi gagal simpan hanya karena kolom marketplace belum ada.
+
+Cara pasang:
+1. Backup file dan database.
+2. Extract ZIP patch ke root aplikasi lalu overwrite.
+3. Buka Admin > Produk Marketplace > Kelola salah satu produk.
+4. Simpan Brand dan upload Galeri.
+5. Buka Admin > Produk > Edit lalu ubah nama/harga/berat dan simpan.
+
+Biasanya tabel compatibility dibuat otomatis. Jika hosting memblokir CREATE TABLE dari
+PHP, import database/patches/patch-marketplace-product-compat-v15_7.sql melalui
+phpMyAdmin pada DATABASE YANG DIGUNAKAN SUBDOMAIN.

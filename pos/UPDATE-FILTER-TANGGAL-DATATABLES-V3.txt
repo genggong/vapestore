@@ -1,0 +1,40 @@
+VAPEKONG UPDATE V3 - FILTER TANGGAL + DATATABLE TERBARU
+Tanggal: 03-09-2026
+
+PERUBAHAN UTAMA
+1. DATA TRANSAKSI
+- Menambahkan filter Cabang + Dari Tanggal + Sampai Tanggal di bagian Data Transaksi.
+- Filter tanggal memakai COALESCE(transaction_date, created_at) agar data lama tetap kompatibel.
+- Tombol Terapkan dan Reset responsif untuk desktop/HP.
+- Filter Data Transaksi terpisah dari filter Laporan Omzet Harian, tetapi kedua filter saling dipertahankan saat submit.
+- Query transaksi diurutkan tanggal terbaru DESC lalu ID terbaru DESC.
+- Kolom Invoice dan Tanggal memiliki data-order yang benar untuk sorting manual DataTables.
+
+2. MULTI CABANG / OMZET
+- Menambahkan filter tanggal untuk Omzet Sukses seluruh cabang.
+- Omzet per cabang dan jumlah invoice mengikuti periode filter.
+- Total Cabang, Total Stok, dan Nilai Modal Stok tidak ikut berubah oleh filter tanggal karena merupakan kondisi stok saat ini.
+- Menampilkan label periode aktif pada ringkasan dan tiap omzet cabang.
+
+3. BUG PERHITUNGAN MULTI CABANG
+- Memperbaiki query lama yang JOIN stok dan transaksi secara langsung.
+- Query lama berpotensi menggandakan Total Stok, Nilai Modal, jumlah invoice, dan Omzet karena fan-out join.
+- Sekarang stok dan transaksi diagregasi pada subquery terpisah sebelum digabungkan ke cabang.
+
+4. DATATABLES
+- DataTables tidak lagi otomatis mengurutkan kolom pertama ASC saat halaman pertama dibuka.
+- Urutan awal sekarang mengikuti ORDER BY backend.
+- Halaman transaksi, produk, supplier, customer, purchase, retur, shift, logs, dan data lain yang backend-nya DESC akan tampil data terbaru di atas.
+- Sorting manual dengan klik header tetap berfungsi.
+- Tabel yang memang sengaja diurutkan stok terendah/alphabetical tetap mempertahankan urutan backend-nya.
+
+5. SINKRONISASI
+- Perubahan diterapkan pada struktur root dan folder /pos.
+
+FILE UTAMA YANG DIUBAH
+- public/admin/transactions/index.php
+- public/admin/branches/index.php
+- public/assets/js/datatables-custom.js
+- pos/public/admin/transactions/index.php
+- pos/public/admin/branches/index.php
+- pos/public/assets/js/datatables-custom.js

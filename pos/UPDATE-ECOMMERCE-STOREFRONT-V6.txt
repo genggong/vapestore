@@ -1,0 +1,21 @@
+VAPEKONG V6 - E-COMMERCE STOREFRONT UI CORE
+==========================================
+
+Fokus update:
+- Homepage publik tidak lagi langsung memaksa login admin; sekarang tampil website e-commerce.
+- Desain mengikuti mockup premium putih/pink/purple dengan CTA merah, rounded card, dan layout responsif.
+- Produk, harga, kategori, stok, statistik customer/cabang dibaca langsung dari database POS.
+- Hero, banner promo, kategori populer, produk terbaru, ringkasan checkout, integrasi, tracking, statistik, dan footer.
+- Katalog produk lengkap dengan search, kategori, sorting, harga, stok, dan tombol keranjang.
+- Keranjang lokal aktif menggunakan localStorage (tambah, kurang, hapus, subtotal).
+- Cart drawer desktop/mobile dan halaman keranjang penuh.
+- Checkout UI lengkap: penerima, alamat, ekspedisi, pembayaran, poin member, ringkasan.
+- Tracking dapat mencari invoice POS yang sudah ada; siap menggunakan tabel shipments ketika modul Shipping API ditambahkan.
+- Mobile bottom navigation.
+- Link "Website E-Commerce" ditambahkan ke sidebar admin.
+- Struktur root dan /pos disinkronkan.
+
+Catatan integrasi:
+- V6 ini adalah UI/UX + katalog/cart bridge ke POS.
+- Tombol "Buat Pesanan" belum membuat shipment/resi sungguhan agar tidak menciptakan order pengiriman palsu sebelum API RajaOngkir/Shipping Delivery dikonfigurasi.
+- Tahap berikutnya dapat menambahkan online_orders, online_order_items, address, shipping quote, create AWB, pickup, webhook tracking, dan payment gateway.

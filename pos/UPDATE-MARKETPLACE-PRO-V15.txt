@@ -1,0 +1,31 @@
+VAPEKONG MARKETPLACE PRO V15
+============================
+Patch kumulatif V10-V15. Upload ke folder script, extract dan overwrite.
+
+V15 menambahkan:
+- Dashboard Marketplace + chart omzet/profit/order/customer/case
+- Homepage Builder + banner desktop/mobile
+- Brand Marketplace
+- Galeri multi-image produk
+- Varian produk + SKU/barcode + harga/HPP/berat + stok per cabang
+- Flash Sale + kuota stok yang di-reserve saat checkout dan dikembalikan saat order dilepas
+- Voucher diskon belanja + gratis/subsidi ongkir per ekspedisi
+- Tukar poin member sebagai potongan checkout + rollback poin jika order dibatalkan/expired
+- Invoice PDF customer/admin
+- Fulfillment Picking -> Packing -> Siap Kirim + bukti packing
+- Stock Alert marketplace + pembuatan Request Stock ke Gudang
+- Activity Log, Integration Log, Cron Monitor
+
+CATATAN
+- Master produk dan stok dasar tetap memakai POS.
+- Stok varian adalah detail stok marketplace pada cabang fulfillment dan tetap membatasi stok induk produk.
+- Flash-sale stock_limit dihitung sebagai quota reserved; order expired/cancel mengembalikan quota.
+- Gratis ongkir menggunakan Voucher Marketplace dengan benefit "Gratis / Subsidi Ongkir".
+- Backup database + script sebelum pemasangan.
+
+PENGATURAN BARU V15
+- Admin > Pengaturan Marketplace: Minimum Stok Alert, Tukar Poin ON/OFF, Auto Request Stock ON/OFF.
+- Auto Request Stock default OFF dan dijalankan oleh marketplace-cron.php. Sistem tidak membuat request baru bila request auto sebelumnya masih pending/approved.
+- Varian memakai alokasi dari stok fisik produk cabang. Total alokasi varian tidak boleh melebihi stok POS/Gudang.
+- Picking/Packing hanya sampai Siap Dikirim. Status Dikirim tetap membutuhkan proses pengiriman/nomor resi.
+- Banner posisi Hero, Promo, dan Custom seluruhnya dirender di homepage jika aktif.

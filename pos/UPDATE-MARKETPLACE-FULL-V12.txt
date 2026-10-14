@@ -1,0 +1,41 @@
+VAPEKONG POS + MARKETPLACE V12
+==============================
+Patch kumulatif: mencakup Gudang/Request Stock V10 + Marketplace RajaOngkir/Pakasir V11 + penyempurnaan V12.
+
+V12:
+- Sidebar "Website E-Commerce" sekarang membuka homepage marketplace yang valid di tab baru.
+- Pengaturan POS dan Pengaturan Marketplace dipisah.
+- Credential Pakasir POS dan Marketplace dipisah tegas.
+- Webhook Pakasir POS dan Marketplace dipisah.
+- RajaOngkir asal memakai dropdown bertingkat: Provinsi > Kota/Kabupaten > Kecamatan > Kelurahan/Desa.
+- Ekspedisi RajaOngkir memakai checkbox ON/OFF per kurir, bukan input kode manual.
+- Cache wilayah RajaOngkir untuk mengurangi request API berulang.
+- Shipping Delivery/Komerce opsional: Create Order, Request Pickup, AWB/resi, label PDF, tracking dan webhook.
+- Resi manual tetap tersedia sebagai fallback.
+- Marketplace dapat diaktifkan/nonaktifkan terpisah dari POS.
+- Fix path bootstrap webhook Pakasir POS untuk instalasi web-root root/public.
+- Update asset version V12 agar CSS/JS tidak tertahan cache browser.
+
+SETUP:
+1. Upload dan overwrite patch ke root script.
+2. Login admin > Pengaturan POS dan pastikan Pakasir POS benar.
+3. Admin > Pengaturan Marketplace:
+   - Aktifkan marketplace.
+   - Pilih cabang fulfillment.
+   - Isi API Key RajaOngkir, simpan jika baru pertama kali.
+   - Pilih Provinsi > Kota/Kabupaten > Kecamatan > Kelurahan/Desa.
+   - Centang ekspedisi yang ingin diaktifkan.
+   - Isi Slug Project + API Key Pakasir Marketplace.
+   - Pasang URL webhook Marketplace ke project Pakasir marketplace.
+4. Shipping Delivery (opsional):
+   - Isi API Key Shipping Delivery yang terpisah.
+   - Pilih Sandbox dahulu untuk pengujian.
+   - Lengkapi data pickup/pengirim.
+   - Pasang URL webhook Shipping Delivery pada dashboard layanan.
+5. Detail Pesanan Marketplace:
+   - Buat Pengiriman Otomatis > Request Pickup > Cetak Label > Sinkron Tracking.
+   - Jika akun Shipping Delivery belum memiliki akses, gunakan Resi Manual.
+
+Database:
+- Tidak wajib import SQL V12. marketplace_install() menambah kolom Shipping Delivery secara additive saat modul dibuka.
+- Backup database dan file sebelum overwrite tetap disarankan.

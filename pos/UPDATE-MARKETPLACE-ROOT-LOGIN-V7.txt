@@ -1,0 +1,29 @@
+VAPEKONG V7 - MARKETPLACE ROOT + LOGIN TERPISAH
+===============================================
+
+Perubahan utama:
+- Domain utama / sekarang langsung membuka marketplace, tanpa redirect ke login atau /public/.
+- Login POS/Admin tetap dipertahankan dan dipisahkan di URL /login.
+- Alias login tambahan: /staff/login dan /admin/login.
+- URL customer dibuat lebih bersih: /produk, /keranjang, /checkout, /tracking.
+- URL lama /store/*.php dan /login.php tetap kompatibel agar bookmark lama tidak rusak.
+- .htaccess root menggunakan internal rewrite ke /public sehingga URL browser tetap bersih.
+- public/.htaccess juga mendukung mode ketika cPanel Document Root diarahkan langsung ke folder /public.
+- Helper base_url diperbaiki agar link tetap benar pada root domain, subfolder install, /admin, /store, dan legacy /public.
+- Header marketplace tidak lagi menampilkan "Hi, Admin"; sekarang jelas "Login Staff".
+- Login diberi tombol "Kembali ke Marketplace" dan meta noindex.
+- Admin sidebar "Website E-Commerce" mengarah ke homepage marketplace canonical.
+- Cache storefront dinaikkan ke v7.0.0.
+- Struktur utama dan /pos disinkronkan.
+
+URL utama:
+- Marketplace: /
+- Produk: /produk
+- Keranjang: /keranjang
+- Checkout: /checkout
+- Tracking: /tracking
+- Login staff/admin: /login
+
+Catatan:
+- Modul akun member/customer login belum diaktifkan pada V7 ini; login yang dipisahkan adalah login internal POS/Admin yang sudah ada.
+- Checkout shipping/resi otomatis tetap menunggu tahap integrasi RajaOngkir/Shipping Delivery berikutnya.

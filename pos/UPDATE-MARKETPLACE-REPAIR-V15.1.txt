@@ -1,0 +1,27 @@
+VAPEKONG MARKETPLACE REPAIR V15.1
+================================
+
+Perbaikan:
+1. Mobile sidebar marketplace terlihat tetapi tap tidak bekerja.
+   Penyebab: backdrop transparan berada di stacking layer di atas nav.
+2. HTTP 500 admin/marketplace-reviews/index.php.
+   Penyebab utama: marketplace_reviews.product_id dibuat BIGINT sementara products.id POS adalah INT, sehingga foreign key ditolak MySQL/MariaDB.
+3. HTTP 500 admin/marketplace-products/index.php.
+   Halaman sekarang memakai schema detection/fallback dan tidak lagi fatal jika brand/variant/gallery migration belum lengkap.
+4. Detail produk marketplace salah menampilkan "Produk tidak ditemukan".
+   Core product sekarang dibaca lebih dulu dari products POS. Error fitur tambahan Brand/Flash Sale/Varian tidak boleh membuat produk valid dianggap hilang.
+5. Brand migration diperbaiki: ADD COLUMN dan ADD INDEX dipisahkan.
+6. Review/wishlist helper dibuat tahan terhadap partial migration.
+7. Cache-bust storefront CSS/JS ke v15.1.0.
+
+CARA PASANG
+- Backup script dan database.
+- Extract ZIP patch ke folder script lalu Overwrite.
+- Buka homepage marketplace sekali, lalu buka:
+  Admin > Produk Marketplace
+  Admin > Ulasan Marketplace
+- Runtime installer akan mencoba memperbaiki tabel otomatis.
+- Jika hosting memblokir auto-DDL, import manual:
+  database/patches/patch-marketplace-repair-v15_1.sql
+
+Tidak perlu mengubah tema.

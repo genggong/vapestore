@@ -1,0 +1,29 @@
+VAPEKONG MARKETPLACE CHECKOUT REPAIR V15.2
+==========================================
+
+Perubahan utama:
+1. Checkout mobile dirapikan dan bottom navigation disembunyikan khusus halaman checkout agar form tidak tertutup.
+2. Alamat tujuan tidak lagi memakai input pencarian teks.
+   Alur baru: Provinsi -> Kota/Kabupaten -> Kecamatan -> Kelurahan/Desa.
+3. Wilayah dipetakan server-side ke ID tujuan ongkir RajaOngkir lalu tarif kurir dimuat otomatis.
+4. Alamat tersimpan tetap kompatibel dan langsung menghitung ongkir.
+5. Kotak lokasi kosong yang sebelumnya tampil walau belum memilih wilayah diperbaiki.
+6. Halaman pembayaran publik hanya menampilkan QRIS atau nomor Virtual Account.
+   Fallback link pembayaran eksternal dihapus dari tampilan customer.
+7. Invoice PDF menampilkan metode pembayaran, nomor Virtual Account jika metode VA, total pembayaran, dan status tanpa menyebut provider pembayaran.
+8. Cache CSS/JS marketplace dinaikkan ke v15.2.0.
+
+Tidak ada perubahan database pada patch ini.
+
+Cara pasang:
+- Backup file terlebih dahulu.
+- Upload ZIP ke folder script lalu Extract/Overwrite.
+- Refresh marketplace / hapus cache browser bila tampilan lama masih muncul.
+- Pastikan Pengaturan Marketplace sudah berisi API Key RajaOngkir, lokasi asal, Slug Project pembayaran, dan API Key pembayaran.
+
+Pengujian yang disarankan:
+- Checkout -> pilih Provinsi -> Kota -> Kecamatan -> Kelurahan.
+- Pastikan ongkir otomatis muncul setelah Kelurahan dipilih.
+- Buat order QRIS dan pastikan yang tampil adalah QRIS, bukan link pembayaran.
+- Buat order Virtual Account dan pastikan nomor VA + tombol Salin tampil.
+- Download invoice PDF dan cek informasi pembayaran.

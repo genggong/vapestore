@@ -1,0 +1,29 @@
+VAPEKONG MARKETPLACE V8 - VISUAL ASSETS / LOGO / IMAGE FALLBACK
+===============================================================
+
+Perubahan utama:
+1. Logo marketplace sekarang berupa aset gambar dan dapat diganti dari Admin > Pengaturan.
+2. Favicon marketplace dapat diganti dari Admin > Pengaturan.
+3. Foto hero marketplace dapat diupload dari Admin > Pengaturan.
+4. Foto dekorasi banner promo dapat diupload dari Admin > Pengaturan.
+5. Disediakan aset default lokal sehingga marketplace tetap bagus walau belum ada upload gambar.
+6. Kategori Liquid, Device, Cartridge, Cotton, Accessories memiliki ilustrasi fallback lokal.
+7. Produk tanpa foto otomatis memakai ilustrasi kategori, bukan area kosong/icon polos.
+8. Produk dengan path gambar lokal yang hilang otomatis menggunakan fallback kategori.
+9. Hero dan promo memiliki fallback lokal jika custom image belum diatur.
+10. Keranjang menyimpan fallback image sehingga gambar tetap tampil di drawer/cart/checkout.
+11. Semua aset fallback disimpan lokal di assets/storefront sehingga tidak bergantung hotlink website lain.
+12. Folder upload storefront dilindungi agar file script tidak dapat dieksekusi.
+13. Perubahan disinkronkan ke struktur utama dan folder /pos.
+
+Lokasi pengaturan:
+Admin > Pengaturan > Visual Marketplace
+
+Upload yang tersedia:
+- Logo Marketplace
+- Favicon Marketplace
+- Foto Hero Marketplace
+- Foto Banner Promo Marketplace
+
+Format upload: JPG / PNG / WEBP, maksimal 5 MB.
+Jika tidak diupload, sistem otomatis memakai aset bawaan.

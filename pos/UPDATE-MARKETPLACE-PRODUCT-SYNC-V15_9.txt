@@ -1,0 +1,26 @@
+VAPEKONG MARKETPLACE PRODUCT SYNC V15.9
+======================================
+
+Tujuan utama:
+- Produk POS adalah satu-satunya master produk.
+- Tidak ada produk marketplace terpisah.
+- Produk aktif POS otomatis tampil di marketplace.
+- Produk nonaktif tetap terlihat di admin Marketplace untuk audit, tetapi tidak tampil ke pembeli.
+- Brand/Merek bersifat OPSIONAL.
+- Varian sekarang mempunyai tipe/atribut terstruktur: Warna, Rasa, Ukuran, Kadar Nikotin, Resistance/Ohm, Kapasitas, Model, atau custom.
+- Setiap kombinasi varian tetap bisa mempunyai SKU, barcode, harga, HPP, berat, dan alokasi stok sendiri.
+- Stok fisik tetap berasal dari POS/Gudang; alokasi varian tidak membuat stok baru.
+
+Alur tambah produk:
+1. Admin > Produk > Tambah Produk.
+2. Isi master produk POS.
+3. Brand boleh dipilih atau Tanpa brand.
+4. Simpan.
+5. Produk aktif otomatis tersedia di marketplace.
+6. Untuk warna/rasa/ukuran/galeri: Admin > Produk Marketplace > Kelola.
+
+Brand artinya merek/pabrikan, contoh: JNC, Vaporesso, Voopoo, OXVA, Uwell.
+Produk generik/aksesoris tanpa merek boleh memakai "Tanpa brand".
+
+Jika auto migration hosting tidak berjalan, import:
+database/patches/patch-marketplace-product-sync-v15_9.sql

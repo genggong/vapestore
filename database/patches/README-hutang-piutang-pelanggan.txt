@@ -1,0 +1,1 @@
+Fitur Hutang/Piutang Pelanggan. Menu: admin/debts/index.php. POS cash bisa bayar sebagian dan sisa otomatis jadi piutang jika pilih member pelanggan.

@@ -1,0 +1,17 @@
+VapeKong Marketplace V15.16
+
+Fitur:
+1. Ongkir Kurir Toko dapat dipisah per Kelurahan/Desa.
+2. Laporan pemasukan ongkir Kurir Toko terpisah + export Excel.
+3. Foto produk POS dapat dipilih multiple; foto pertama menjadi master, sisanya galeri Marketplace.
+4. Setiap varian dapat memiliki 1 foto sendiri.
+5. Stok varian diinput manual per cabang. Stok induk POS otomatis = total stok semua varian aktif.
+6. POS Kasir menampilkan produk bervarian sebagai item terpisah dan mengurangi stok varian yang dipilih.
+7. Template Import/Export Produk Excel memiliki Brand dan data Varian.
+8. Template Stock Opname menampilkan baris per varian, contoh: Foom X Switch Prime - White GT - 2.
+9. Finalisasi Stock Opname memperbarui stok varian dan menyinkronkan stok induk.
+
+Catatan:
+- Produk tanpa varian tetap memakai stok induk seperti sebelumnya.
+- Produk dengan varian: ubah stok dari menu Produk Marketplace > Kelola > Varian.
+- Untuk Kurir Toko per kelurahan, pilih model tarif "Per Kelurahan / Desa" di Pengaturan Marketplace lalu isi Tarif Kurir Toko.

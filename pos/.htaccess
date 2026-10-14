@@ -1,0 +1,74 @@
+<IfModule mime_module>
+    AddHandler application/x-httpd-alt-php81 .php .php8 .phtml
+</IfModule>
+
+DirectoryIndex index.php
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Folder internal tidak boleh diakses langsung dari web.
+    RewriteRule ^(app|database|storage)(/|$) - [F,L,NC]
+
+    # File sensitif.
+    RewriteRule (^|/)(\.env|composer\.(json|lock)|package(-lock)?\.json|README\.md|.*\.sql|.*\.zip|.*\.bak|.*\.log)$ - [F,L,NC]
+
+    # URL marketplace bersih.
+    RewriteRule ^produk/?$ public/store/products.php [L,QSA]
+    RewriteRule ^produk/([0-9]+)(?:-[A-Za-z0-9-]+)?/?$ public/store/product.php?id=$1 [L,QSA]
+    RewriteRule ^masuk/?$ public/store/login.php [L,QSA]
+    RewriteRule ^daftar/?$ public/store/register.php [L,QSA]
+    RewriteRule ^akun/?$ public/store/account.php [L,QSA]
+    RewriteRule ^profil/?$ public/store/profile.php [L,QSA]
+    RewriteRule ^pesanan-saya/?$ public/store/orders.php [L,QSA]
+    RewriteRule ^alamat-saya/?$ public/store/addresses.php [L,QSA]
+    RewriteRule ^wishlist/?$ public/store/wishlist.php [L,QSA]
+    RewriteRule ^notifikasi/?$ public/store/notifications.php [L,QSA]
+    RewriteRule ^bantuan-pesanan/?$ public/store/support.php [L,QSA]
+    RewriteRule ^bantuan-pesanan/([0-9]+)/?$ public/store/support-detail.php?id=$1 [L,QSA]
+    RewriteRule ^keluar-akun/?$ public/store/customer-logout.php [L,QSA]
+    RewriteRule ^keranjang/?$ public/store/cart.php [L,QSA]
+    RewriteRule ^checkout/?$ public/store/checkout.php [L,QSA]
+    RewriteRule ^tracking/?$ public/store/tracking.php [L,QSA]
+    RewriteRule ^pesanan/([A-Za-z0-9-]+)/?$ public/store/order.php?order=$1 [L,QSA]
+
+    # Portal Kurir Toko.
+    RewriteRule ^kurir/?$ public/courier/index.php [L,QSA]
+    RewriteRule ^kurir/login/?$ public/courier/login.php [L,QSA]
+    RewriteRule ^kurir/logout/?$ public/courier/logout.php [L,QSA]
+    RewriteRule ^kurir/selesai/?$ public/courier/done.php [L,QSA]
+    RewriteRule ^kurir/profil/?$ public/courier/profile.php [L,QSA]
+    RewriteRule ^kurir/paket/([0-9]+)/?$ public/courier/order.php?id=$1 [L,QSA]
+
+    # Login POS / Admin dipisahkan dari halaman marketplace.
+    RewriteRule ^login/?$ public/login.php [L,QSA]
+    RewriteRule ^staff/login/?$ public/login.php [L,QSA]
+    RewriteRule ^admin/login/?$ public/login.php [L,QSA]
+
+    # Kompatibilitas URL lama dan seluruh modul publik yang sudah ada.
+    RewriteRule ^(store|admin|assets|uploads|courier)/(.*)$ public/$1/$2 [L,QSA]
+    RewriteRule ^(login|logout|maintenance|license-required|license-setup|pakasir-webhook|marketplace-pakasir-webhook|marketplace-delivery-webhook|marketplace-wa-webhook|marketplace-cron)\.php$ public/$1.php [L,QSA]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+</IfModule>
+
+<FilesMatch "\.(env|sql|zip|bak|log|ini|sh|md)$">
+    Require all denied
+</FilesMatch>
+
+# BEGIN cPanel-generated php ini directives, do not edit
+<IfModule php8_module>
+   php_value error_log "/home/coptahco/logs/php.error.log"
+   php_flag log_errors On
+</IfModule>
+<IfModule lsapi_module>
+   php_value error_log "/home/coptahco/logs/php.error.log"
+   php_flag log_errors On
+</IfModule>
+# END cPanel-generated php ini directives, do not edit

@@ -1,0 +1,1 @@
+Fix pembayaran piutang via QRIS: metode QRIS sekarang membuat QRIS pending dulu, tampil halaman scan, polling status Pakasir, lalu otomatis mencatat pembayaran saat sukses.

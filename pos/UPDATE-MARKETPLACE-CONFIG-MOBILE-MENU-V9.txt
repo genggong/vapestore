@@ -1,0 +1,12 @@
+V9 - Marketplace Configuration & Mobile Menu Fix
+
+- Header/footer marketplace tidak lagi menampilkan link Login Staff/Admin.
+- Navigasi mobile tombol Staff diganti Promo.
+- Menu mobile tidak lagi membuat halaman gelap; backdrop dibuat sangat lembut dan menu dipaksa putih.
+- Menu mobile menutup saat link dipilih, klik area luar, ESC, atau layar membesar.
+- Pengaturan POS/Admin sekarang dapat mengatur title browser, meta description, label hero, judul hero, subtitle, deskripsi footer, email, jam operasional, WhatsApp, Instagram, TikTok, Facebook.
+- Footer membaca seluruh data dari pengaturan POS/Admin.
+- Tombol WhatsApp floating tampil otomatis jika nomor/link WhatsApp diisi.
+- Tambah section Cara Belanja dan FAQ yang customer-facing.
+- Semua link footer diarahkan ke halaman/section yang berfungsi; tidak ada link # kosong dan tidak ada login internal.
+- Struktur root dan /pos disinkronkan.

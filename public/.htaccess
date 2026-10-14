@@ -1,0 +1,48 @@
+# Public web root - homepage = marketplace
+DirectoryIndex index.php
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Clean routes also work when cPanel Document Root points directly to /public.
+    RewriteRule ^produk/?$ store/products.php [L,QSA]
+    RewriteRule ^produk/([0-9]+)(?:-[A-Za-z0-9-]+)?/?$ store/product.php?id=$1 [L,QSA]
+    RewriteRule ^masuk/?$ store/login.php [L,QSA]
+    RewriteRule ^daftar/?$ store/register.php [L,QSA]
+    RewriteRule ^akun/?$ store/account.php [L,QSA]
+    RewriteRule ^profil/?$ store/profile.php [L,QSA]
+    RewriteRule ^pesanan-saya/?$ store/orders.php [L,QSA]
+    RewriteRule ^alamat-saya/?$ store/addresses.php [L,QSA]
+    RewriteRule ^wishlist/?$ store/wishlist.php [L,QSA]
+    RewriteRule ^notifikasi/?$ store/notifications.php [L,QSA]
+    RewriteRule ^bantuan-pesanan/?$ store/support.php [L,QSA]
+    RewriteRule ^bantuan-pesanan/([0-9]+)/?$ store/support-detail.php?id=$1 [L,QSA]
+    RewriteRule ^keluar-akun/?$ store/customer-logout.php [L,QSA]
+    RewriteRule ^keranjang/?$ store/cart.php [L,QSA]
+    RewriteRule ^checkout/?$ store/checkout.php [L,QSA]
+    RewriteRule ^tracking/?$ store/tracking.php [L,QSA]
+    RewriteRule ^pesanan/([A-Za-z0-9-]+)/?$ store/order.php?order=$1 [L,QSA]
+
+    # Portal Kurir Toko.
+    RewriteRule ^kurir/?$ courier/index.php [L,QSA]
+    RewriteRule ^kurir/login/?$ courier/login.php [L,QSA]
+    RewriteRule ^kurir/logout/?$ courier/logout.php [L,QSA]
+    RewriteRule ^kurir/selesai/?$ courier/done.php [L,QSA]
+    RewriteRule ^kurir/profil/?$ courier/profile.php [L,QSA]
+    RewriteRule ^kurir/paket/([0-9]+)/?$ courier/order.php?id=$1 [L,QSA]
+
+    # Separate staff/admin login routes.
+    RewriteRule ^login/?$ login.php [L,QSA]
+    RewriteRule ^staff/login/?$ login.php [L,QSA]
+    RewriteRule ^admin/login/?$ login.php [L,QSA]
+
+    RewriteRule (^|/)(\.env|composer\.(json|lock)|package(-lock)?\.json|README\.md|.*\.sql|.*\.zip|.*\.bak|.*\.log)$ - [F,L,NC]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+</IfModule>

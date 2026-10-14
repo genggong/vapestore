@@ -1,0 +1,1 @@
+Fitur Retur Supplier. Menu admin/supplier-returns/index.php. Retur barang ke supplier, stok otomatis berkurang, stock_movements type supplier_return.

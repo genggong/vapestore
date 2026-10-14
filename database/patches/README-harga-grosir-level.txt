@@ -1,0 +1,1 @@
+Fitur Harga Grosir / Level Harga. Menu admin/prices/index.php. POS bisa pilih level harga: ecer, grosir, reseller, member.

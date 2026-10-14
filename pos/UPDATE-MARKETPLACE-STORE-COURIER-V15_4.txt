@@ -1,0 +1,40 @@
+VAPEKONG MARKETPLACE V15.4 - KURIR TOKO
+========================================
+
+FITUR BARU
+- Opsi checkout "Kurir Toko" dengan ongkir flat, estimasi dan area layanan.
+- Area layanan: kecamatan sama / kota sama / provinsi sama / semua wilayah.
+- Pengaturan Kurir Toko terpisah di Pengaturan Marketplace.
+- Admin: menu Kurir Toko untuk membuat akun kurir per cabang.
+- Admin: menu Pengiriman Kurir Toko untuk memantau paket dan order belum ditugaskan.
+- Admin order: assign/reassign kurir toko.
+- Portal kurir khusus: /kurir/login
+- Portal kurir terpisah dari login admin/POS/customer.
+- Kurir hanya melihat paket yang ditugaskan kepadanya.
+- Alur kurir: Ditugaskan -> Terima Tugas -> Paket Diambil -> Dalam Perjalanan -> Terkirim.
+- Gagal antar dan Kembali ke Toko tersedia.
+- Paket hanya dapat diambil setelah fulfillment Picking & Packing = Siap Dikirim.
+- Terkirim wajib nama penerima + foto bukti (JPG/PNG/WEBP maks 6MB).
+- Status order customer/tracking mengikuti update portal kurir.
+- WA customer memakai antrean Teknorilis yang sudah ada saat paket mulai diantar dan selesai.
+- Return-to-store mengembalikan order ke processing + ready_ship agar dapat ditugaskan ulang.
+
+ALUR SETUP
+1. Upload patch lalu Extract/Overwrite.
+2. Admin -> Pengaturan Marketplace -> Kurir Toko.
+3. Aktifkan Kurir Toko, isi ongkir flat, estimasi, dan area layanan.
+4. Pastikan wilayah asal RajaOngkir sudah lengkap.
+5. Admin -> Kurir Toko -> Tambah akun kurir.
+6. Kurir login melalui /kurir/login.
+7. Customer checkout dan memilih Kurir Toko jika alamat masuk area.
+8. Setelah pembayaran dan packing siap, admin assign kurir dari Detail Pesanan.
+9. Kurir update paket melalui portal sampai unggah bukti diterima.
+
+DATABASE
+Migration dilakukan otomatis oleh marketplace_install(). Jika hosting memblokir CREATE TABLE, import:
+database/patches/patch-marketplace-store-courier-v15_4.sql
+
+CATATAN
+- Kurir Toko hanya muncul di checkout jika fitur aktif DAN ada minimal satu akun kurir aktif yang cocok dengan cabang fulfillment.
+- Tarif Kurir Toko dihitung ulang server-side saat order dibuat.
+- API key RajaOngkir tetap diperlukan untuk pemilihan wilayah tujuan dan validasi area.

@@ -1,0 +1,1 @@
+Fitur Rak / Lokasi Barang: menu admin/locations/index.php, lokasi per produk dan cabang, tampil di POS dan stock opname.

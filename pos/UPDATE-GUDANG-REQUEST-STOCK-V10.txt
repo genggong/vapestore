@@ -1,0 +1,29 @@
+UPDATE GUDANG + REQUEST STOCK CABANG V10
+========================================
+
+Fitur baru:
+1. Menu Gudang dengan stok terpisah dari stok cabang/POS.
+2. Pembelian supplier sekarang memiliki Tujuan Stok:
+   - Gudang (default dan direkomendasikan)
+   - Cabang (untuk kompatibilitas alur lama)
+3. Request Stock dapat diakses kasir karena memakai hak akses POS.
+4. Alur Request Stock:
+   Cabang buat request -> Gudang setujui -> Gudang fulfill/kirim -> stok gudang berkurang -> stok cabang bertambah.
+5. Harga cabang dari gudang = harga modal gudang dari supplier, TANPA margin.
+6. Audit pergerakan stok gudang disimpan di warehouse_stock_movements.
+7. Request menyimpan snapshot harga modal dan stok sebelum/sesudah fulfillment.
+8. Jika target cabang adalah cabang utama, products.stock ikut disinkronkan agar POS lama tetap kompatibel.
+9. Pembatalan pembelian supplier sekarang mengoreksi stok sesuai tujuan pembelian (Gudang/Cabang) dan menolak pembatalan jika stok sudah terpakai.
+10. Marketplace tetap memakai tabel products/product_branch_stocks yang sama; stok gudang tidak langsung dianggap stok jual marketplace sampai dikirim ke cabang.
+
+INSTALL / UPDATE:
+- Upload/replace file patch sesuai struktur folder.
+- Tidak wajib import SQL manual: tabel/kolom dibuat otomatis saat menu Gudang / Request Stock / Pembelian dibuka.
+- SQL manual tersedia di database/patches/patch-gudang-request-stock-v1.sql bila diperlukan.
+
+CATATAN AUDIT MARKETPLACE:
+- Katalog marketplace sudah membaca products + total product_branch_stocks.
+- Checkout masih demo/UI: belum membuat online order nyata.
+- Tarif kurir masih angka statis, belum request API RajaOngkir.
+- Belum ada tabel/alur online_orders + shipments aktif dari checkout.
+- Tahap lanjutan yang disarankan: aktifkan checkout real, RajaOngkir, order online -> transaksi/stok cabang, pembayaran, dan tracking.

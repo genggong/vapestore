@@ -1,0 +1,12 @@
+VapeKong POS + Marketplace - Cumulative Patch V13
+
+Patch ini kumulatif dari script app (19) dan mencakup V10 Gudang/Request Stock, V11 RajaOngkir+Pakasir v2, V12 pemisahan setting/Shipping Delivery, serta V13 customer marketplace.
+
+Cara pasang:
+1. Backup file dan database.
+2. Upload isi ZIP ke folder instalasi yang sama lalu overwrite file lama.
+3. Login admin dan buka Pengaturan Marketplace / Marketplace. Tabel tambahan dibuat otomatis oleh marketplace_install().
+4. Jika auto-migration tidak dapat ALTER/CREATE TABLE, jalankan database/patches/patch-marketplace-customer-v13.sql secara manual setelah patch sebelumnya.
+5. Clear cache browser jika CSS/JS lama masih terbaca.
+
+Fitur V13: akun customer terhubung customers POS, alamat tersimpan, wishlist, profil, riwayat pesanan, voucher marketplace, review pembelian terverifikasi, notifikasi order, poin member marketplace, detail produk, admin voucher & moderasi review.
