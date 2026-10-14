@@ -52,6 +52,8 @@ if (is_post()) {
     $creditLimit = (float)($_POST['credit_limit'] ?? 0);
     $note = trim($_POST['note'] ?? '');
     $status = $_POST['status'] ?? 'active';
+    // V17.0.11: password marketplace (opsional) — admin bisa set/reset utk login pelanggan
+    $newPassword = (string)($_POST['marketplace_password'] ?? '');
 
     if ($name === '') {
         flash('error', 'Nama pelanggan wajib diisi.');
@@ -60,9 +62,18 @@ if (is_post()) {
 
     try {
 
-        $stmt = $db->prepare("UPDATE customers SET name=?, phone=?, email=?, address=?, member_code=?, member_level=?, price_level=?, points=?, credit_limit=?, note=?, status=? WHERE id=?");
-        $stmt->execute([$name, $phone ?: null, $email ?: null, $address ?: null, $memberCode ?: null, $memberLevel, $priceLevel, $points, $creditLimit, $note ?: null, $status, $id]);
-        Auth::log('update_customer', 'Update pelanggan ' . $name);
+        if ($newPassword !== '') {
+            if (strlen($newPassword) < 6) {
+                throw new InvalidArgumentException('Password minimal 6 karakter.');
+            }
+            $stmt = $db->prepare("UPDATE customers SET name=?, phone=?, email=?, address=?, member_code=?, member_level=?, price_level=?, points=?, credit_limit=?, note=?, status=?, marketplace_password_hash=?, marketplace_registered_at=COALESCE(marketplace_registered_at,NOW()), updated_at=NOW() WHERE id=?");
+            $stmt->execute([$name, $phone ?: null, $email ?: null, $address ?: null, $memberCode ?: null, $memberLevel, $priceLevel, $points, $creditLimit, $note ?: null, $status, password_hash($newPassword, PASSWORD_DEFAULT), $id]);
+            Auth::log('update_customer', 'Update pelanggan ' . $name . ' (password marketplace di-set)');
+        } else {
+            $stmt = $db->prepare("UPDATE customers SET name=?, phone=?, email=?, address=?, member_code=?, member_level=?, price_level=?, points=?, credit_limit=?, note=?, status=? WHERE id=?");
+            $stmt->execute([$name, $phone ?: null, $email ?: null, $address ?: null, $memberCode ?: null, $memberLevel, $priceLevel, $points, $creditLimit, $note ?: null, $status, $id]);
+            Auth::log('update_customer', 'Update pelanggan ' . $name);
+        }
         flash('success', 'Pelanggan berhasil diperbarui.');
 
         legacy_redirect('admin/customers/index.php');
@@ -121,6 +132,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
             </div>
             <div class="customer-field full"><label>Alamat</label><textarea name="address"><?= e($customer['address']); ?></textarea></div>
             <div class="customer-field full"><label>Catatan</label><textarea name="note"><?= e($customer['note']); ?></textarea></div>
+            <div class="customer-field full"><label>Password Marketplace (opsional)</label><input type="password" name="marketplace_password" placeholder="Kosongkan jika tidak ingin mengubah" autocomplete="new-password"><small style="color:#8b93a1">Untuk login pelanggan di marketplace pakai No HP + password ini. Minimal 6 karakter.</small></div>
         </div>
 
         <div class="customer-form-actions">
