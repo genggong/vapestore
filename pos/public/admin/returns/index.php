@@ -29,7 +29,7 @@ foreach ($returns as $r) {
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/returns.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/returns.css?v=' . APP_ASSET_VERSION); ?>">
 
 <main class="admin-main returns-wrap">
     <header class="admin-topbar page-topbar">

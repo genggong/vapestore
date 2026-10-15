@@ -16,7 +16,7 @@ function stock_type_badge($type) {
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link href="<?= base_url('assets/css/stock.css?v=' . time()); ?>" rel="stylesheet">
+<link href="<?= base_url('assets/css/stock.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
 <main class="admin-main">
   <header class="admin-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Riwayat Stok</h1><p>Semua pergerakan stok: penjualan, stok masuk, stok keluar, adjustment, dan refund.</p></div><div class="topbar-actions"><a href="<?= base_url('admin/stock/index.php'); ?>" class="btn-soft"><i class="bi bi-arrow-left"></i> Stok</a></div></header>
   <section class="premium-card mt-4 stock-card"><div class="card-head"><div><h3>Log Pergerakan Stok</h3><p>Data terbaru ditampilkan paling atas.</p></div><span class="badge-soft danger"><?= count($rows); ?> Log</span></div>

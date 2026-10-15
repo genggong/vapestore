@@ -9,7 +9,7 @@ $message = setting('maintenance_message', 'Mohon maaf, sistem sedang maintenance
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Maintenance - <?= e(setting('app_name', 'KasirPro UMKM')); ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/css/maintenance.css?v=' . time()); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/maintenance.css?v=' . APP_ASSET_VERSION); ?>">
 </head>
 <body>
     <main class="maintenance-card">

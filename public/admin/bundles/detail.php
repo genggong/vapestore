@@ -20,9 +20,9 @@ $available = bundle_available_stock($db, $id, $currentBranchId);
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/system.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/css/bundles.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/css/sweetalert-theme.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/system.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/bundles.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/sweetalert-theme.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main system-wrap">
 <header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Detail Paket Produk</h1><p><?= e($bundle['code']); ?> • <?= e($bundle['name']); ?></p></div><div class="topbar-actions"><a class="system-btn soft" href="<?= base_url('admin/bundles/index.php'); ?>">Kembali</a><a class="system-btn primary" href="<?= base_url('admin/bundles/edit.php?id=' . $id); ?>">Edit</a></div></header>
 <section class="system-form-card">

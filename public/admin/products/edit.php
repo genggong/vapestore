@@ -119,7 +119,7 @@ if(is_post()){
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link href="<?= base_url('assets/css/product-barcode.css?v=' . time()); ?>" rel="stylesheet">
+<link href="<?= base_url('assets/css/product-barcode.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
 
 <style>
 .product-price-priority{background:linear-gradient(135deg,#faf5ff,#fff1f2);border:1px solid #e9d5ff;border-radius:20px;padding:14px}.product-price-priority label{color:#6b21a8!important}.product-edit-quick-save{display:flex!important;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0 2px}.product-edit-quick-save .btn-premium{min-height:50px}.product-edit-quick-save small{color:#64748b;font-weight:750}@media(max-width:720px){.product-edit-quick-save{position:sticky;top:8px;z-index:15;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border:1px solid #f3e8ff;border-radius:18px;padding:10px;box-shadow:0 12px 28px rgba(107,33,168,.12)}.product-edit-quick-save .btn-premium{width:100%;justify-content:center}.premium-form{padding-bottom:115px}}
@@ -201,5 +201,5 @@ if (typeof window.Html5Qrcode === 'undefined') {
     document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"><\/script>');
 }
 </script>
-<script src="<?= base_url('assets/js/product-barcode.js?v=' . time()); ?>"></script>
+<script src="<?= base_url('assets/js/product-barcode.js?v=' . APP_ASSET_VERSION); ?>"></script>
 <?php require_once __DIR__ . '/../../layouts/admin-footer.php'; ?>

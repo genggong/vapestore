@@ -60,13 +60,13 @@ if (!function_exists('bottom_active')) {
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 
 <!-- App JS -->
-<script src="<?= legacy_base_url('assets/js/sweetalert.js?v=' . time()); ?>"></script>
-<script src="<?= legacy_base_url('assets/js/app.js?v=' . time()); ?>"></script>
-<script src="<?= legacy_base_url('assets/js/ui-final-reset.js?v=' . time()); ?>"></script>
-<script src="<?= legacy_base_url('assets/js/pos-active-transaction-hardfix.js?v=' . time()); ?>"></script>
+<script src="<?= legacy_base_url('assets/js/sweetalert.js?v=' . APP_ASSET_VERSION); ?>"></script>
+<script src="<?= legacy_base_url('assets/js/app.js?v=' . APP_ASSET_VERSION); ?>"></script>
+<script src="<?= legacy_base_url('assets/js/ui-final-reset.js?v=' . APP_ASSET_VERSION); ?>"></script>
+<script src="<?= legacy_base_url('assets/js/pos-active-transaction-hardfix.js?v=' . APP_ASSET_VERSION); ?>"></script>
 
 <!-- DataTables Custom WAJIB paling bawah -->
-<script src="<?= legacy_base_url('assets/js/datatables-custom.js?v=' . time()); ?>"></script>
+<script src="<?= legacy_base_url('assets/js/datatables-custom.js?v=' . APP_ASSET_VERSION); ?>"></script>
 
 <?php
 $flashSuccess = flash('success');
@@ -352,10 +352,10 @@ $flashInfo = flash('info');
 })();
 </script>
 
-    <script src="<?= legacy_base_url('assets/js/sweetalert-theme.js?v=' . time()); ?>"></script>
-    <script src="<?= legacy_base_url('assets/js/status-color-fixed.js?v=' . time()); ?>"></script>
-    <script src="<?= legacy_base_url('assets/js/status-color-force.js?v=' . time()); ?>"></script>
-    <script src="<?= legacy_base_url('assets/js/admin-ui-rescue.js?v=' . time()); ?>"></script>
-    <script src="<?= legacy_base_url('assets/js/theme-color-settings.js?v=' . time()); ?>"></script>
+    <script src="<?= legacy_base_url('assets/js/sweetalert-theme.js?v=' . APP_ASSET_VERSION); ?>"></script>
+    <script src="<?= legacy_base_url('assets/js/status-color-fixed.js?v=' . APP_ASSET_VERSION); ?>"></script>
+    <script src="<?= legacy_base_url('assets/js/status-color-force.js?v=' . APP_ASSET_VERSION); ?>"></script>
+    <script src="<?= legacy_base_url('assets/js/admin-ui-rescue.js?v=' . APP_ASSET_VERSION); ?>"></script>
+    <script src="<?= legacy_base_url('assets/js/theme-color-settings.js?v=' . APP_ASSET_VERSION); ?>"></script>
 </body>
 </html>

@@ -48,7 +48,7 @@ $users = (int)$db->query("SELECT COUNT(DISTINCT user_id) FROM activity_logs WHER
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/audit.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/audit.css?v=' . APP_ASSET_VERSION); ?>">
 
 <main class="admin-main audit-wrap">
     <header class="admin-topbar page-topbar">

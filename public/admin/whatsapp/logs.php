@@ -16,7 +16,7 @@ $rows = $db->query("SELECT wl.*, t.invoice_number, u.name AS sender_name
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/system.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/system.css?v=' . APP_ASSET_VERSION); ?>">
 <style>.wa-status{display:inline-flex;border-radius:999px;padding:6px 10px;font-weight:900;font-size:12px}.wa-status.success{background:#dcfce7;color:#166534}.wa-status.failed{background:#fee2e2;color:#991b1b}.wa-response{max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#64748b}.wa-table-wrap{overflow:auto}</style>
 <main class="admin-main system-wrap">
     <header class="admin-topbar page-topbar">

@@ -56,7 +56,7 @@ $chartPayload = [
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/accounting.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/accounting.css?v=' . APP_ASSET_VERSION); ?>">
 
 <main class="admin-main accounting-wrap">
     <header class="admin-topbar page-topbar accounting-no-print">
@@ -283,5 +283,5 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 
 <script type="application/json" id="accountingChartData"><?= json_encode($chartPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
-<script src="<?= legacy_base_url('assets/js/accounting.js?v=' . time()); ?>"></script>
+<script src="<?= legacy_base_url('assets/js/accounting.js?v=' . APP_ASSET_VERSION); ?>"></script>
 <?php require_once __DIR__ . '/../../layouts/admin-footer.php'; ?>

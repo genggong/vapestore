@@ -102,7 +102,7 @@ if(is_post()){
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link href="<?= base_url('assets/css/product-barcode.css?v=' . time()); ?>" rel="stylesheet">
+<link href="<?= base_url('assets/css/product-barcode.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
 <style>.variant-create-row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr .8fr auto;gap:8px;align-items:end}.variant-create-row input{width:100%}@media(max-width:900px){.variant-create-row{grid-template-columns:1fr 1fr}}@media(max-width:560px){.variant-create-row{grid-template-columns:1fr}.variant-create-row .btn-soft{width:100%}}</style>
 <main class="admin-main">
     <header class="admin-topbar">
@@ -202,5 +202,5 @@ if (typeof window.Html5Qrcode === 'undefined') {
     document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"><\/script>');
 }
 </script>
-<script src="<?= base_url('assets/js/product-barcode.js?v=' . time()); ?>"></script>
+<script src="<?= base_url('assets/js/product-barcode.js?v=' . APP_ASSET_VERSION); ?>"></script>
 <?php require_once __DIR__ . '/../../layouts/admin-footer.php'; ?>

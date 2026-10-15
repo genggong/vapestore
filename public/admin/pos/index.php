@@ -987,7 +987,7 @@ require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
 
-<link rel="stylesheet" href="<?= base_url('assets/css/locations.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/locations.css?v=' . APP_ASSET_VERSION); ?>">
 
 <style>
 .pos-member-add-link,
@@ -1024,7 +1024,7 @@ a.pos-member-add-link {
 }
 </style>
 
-<link rel="stylesheet" href="<?= base_url('assets/css/debts.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/debts.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main pos-main">
     <header class="admin-topbar page-topbar pos-topbar">
         <button class="sidebar-toggle" id="sidebarToggle">

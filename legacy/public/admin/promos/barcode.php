@@ -33,8 +33,8 @@ if ($barcodeCode === '') {
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/promos.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/promo-barcode-share.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/promos.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/promo-barcode-share.css?v=' . APP_ASSET_VERSION); ?>">
 
 <main class="admin-main promo-barcode-wrap">
     <header class="admin-topbar page-topbar">

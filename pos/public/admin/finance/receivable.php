@@ -56,7 +56,7 @@ $rows = $db->query("SELECT * FROM receivables ORDER BY id DESC")->fetchAll();
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/finance.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/finance.css?v=' . APP_ASSET_VERSION); ?>">
 
 <main class="admin-main finance-wrap">
 <header class="admin-topbar page-topbar">

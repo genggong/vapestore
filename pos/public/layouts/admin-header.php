@@ -29,27 +29,27 @@ if (!in_array($themeColor, $allowedThemeColors, true)) {
     <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
 
     <!-- App CSS -->
-    <link href="<?= base_url('assets/css/app.css?v=' . time()); ?>" rel="stylesheet">
-    <link href="<?= base_url('assets/css/admin.css?v=' . time()); ?>" rel="stylesheet">
-    <link href="<?= base_url('assets/css/transaction-detail.css?v=' . time()); ?>" rel="stylesheet">
-    <link href="<?= base_url('assets/css/finance.css?v=' . time()); ?>" rel="stylesheet">
-    <link href="<?= base_url('assets/css/pos.css?v=' . time()); ?>" rel="stylesheet">
-    <link href="<?= base_url('assets/css/global-form-fix.css?v=' . time()); ?>" rel="stylesheet">
-    <link href="<?= base_url('assets/css/ui-final-reset.css?v=' . time()); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/app.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/admin.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/transaction-detail.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/finance.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/pos.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/global-form-fix.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/ui-final-reset.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
 
     <!-- DataTables Custom WAJIB paling bawah di header -->
-    <link href="<?= base_url('assets/css/datatables-custom.css?v=' . time()); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/datatables-custom.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
 
-    <link rel="stylesheet" href="<?= base_url('assets/css/sweetalert-theme.css?v=' . time()); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/datatables-spacing-fix.css?v=' . time()); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/print-polish.css?v=' . time()); ?>" media="print">
-    <link rel="stylesheet" href="<?= base_url('assets/css/global-ui-responsive-fix.css?v=' . time()); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/datatables-actions-status.css?v=' . time()); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/status-color-fixed.css?v=' . time()); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/status-color-force.css?v=' . time()); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/admin-ui-rescue.css?v=' . time()); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/theme-color-settings.css?v=' . time()); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/theme-color-full-override.css?v=' . time()); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/sweetalert-theme.css?v=' . APP_ASSET_VERSION); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/datatables-spacing-fix.css?v=' . APP_ASSET_VERSION); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/print-polish.css?v=' . APP_ASSET_VERSION); ?>" media="print">
+    <link rel="stylesheet" href="<?= base_url('assets/css/global-ui-responsive-fix.css?v=' . APP_ASSET_VERSION); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/datatables-actions-status.css?v=' . APP_ASSET_VERSION); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/status-color-fixed.css?v=' . APP_ASSET_VERSION); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/status-color-force.css?v=' . APP_ASSET_VERSION); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-ui-rescue.css?v=' . APP_ASSET_VERSION); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/theme-color-settings.css?v=' . APP_ASSET_VERSION); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/theme-color-full-override.css?v=' . APP_ASSET_VERSION); ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/marketplace-internal-theme.css?v=15.8.0'); ?>">
 </head>
 <body data-theme-color="<?= e($themeColor); ?>" data-marketplace-theme-sync="<?= $marketplaceThemeSync ? 'on' : 'off'; ?>">

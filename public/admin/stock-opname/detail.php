@@ -14,8 +14,8 @@ $items = opname_items($db, $id);
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/stock-opname.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/css/locations.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/stock-opname.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/locations.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main stock-opname-page">
     <header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Detail Stock Opname</h1><p><?= e($opname['code']); ?> • <?= e($opname['title']); ?></p></div><div class="topbar-actions"><a class="opname-btn soft" href="<?= base_url('admin/stock-opname/index.php'); ?>"><i class="bi bi-arrow-left"></i> Kembali</a></div></header>
     <section class="opname-grid">

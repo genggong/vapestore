@@ -52,8 +52,8 @@ $query = http_build_query(['from' => $from, 'to' => $to, 'type' => $type]);
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/finance.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/modules/data-exchange.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/finance.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/modules/data-exchange.css?v=' . APP_ASSET_VERSION); ?>">
 
 <main class="admin-main finance-wrap">
     <header class="admin-topbar page-topbar">

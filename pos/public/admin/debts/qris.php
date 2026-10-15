@@ -23,8 +23,8 @@ if (!$qris) {
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/system.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/css/debts.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/system.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/debts.css?v=' . APP_ASSET_VERSION); ?>">
 <style>
 .debt-qris-card{background:#fff;border:1px solid #fee2e2;border-radius:28px;padding:22px;box-shadow:0 16px 45px rgba(153,27,27,.08);display:grid;gap:18px}.debt-qris-head h2{margin:0;color:#7f1d1d;font-weight:900}.debt-qris-head p{margin:6px 0 0;color:#64748b;font-weight:700}.debt-qris-box{background:#fff7f7;border:1px solid #fecaca;border-radius:24px;padding:18px;display:flex;justify-content:center;align-items:center;min-height:260px}.debt-qris-lines{display:grid;gap:10px}.debt-qris-line{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed #fecaca;padding:10px 0}.debt-qris-line b{color:#7f1d1d}.debt-qris-status{border-radius:999px;padding:10px 14px;font-weight:900;width:max-content}.debt-qris-status.pending{background:#fef3c7;color:#92400e}.debt-qris-status.success{background:#dcfce7;color:#166534}.debt-qris-status.failed{background:#fee2e2;color:#991b1b}@media(max-width:600px){.debt-qris-line{display:grid}.debt-qris-card{padding:18px}}
 </style>

@@ -26,8 +26,8 @@ $levels = price_levels();
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/system.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/prices.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/system.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/prices.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main system-wrap">
 <header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Edit Cepat Harga</h1><p>Ubah harga ecer, grosir, reseller, dan member banyak produk sekaligus.</p></div><div class="topbar-actions"><a class="system-btn soft" href="<?= legacy_base_url('admin/prices/index.php'); ?>">Kembali</a></div></header>
 <form method="POST" class="system-form-card"><?= CSRF::input(); ?><div class="table-responsive"><table class="premium-table price-bulk-table"><thead><tr><th>Produk</th><?php foreach($levels as $label): ?><th><?= e($label); ?></th><?php endforeach; ?></tr></thead><tbody>

@@ -36,7 +36,7 @@ $products = $stmtProducts->fetchAll();
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link href="<?= legacy_base_url('assets/css/stock.css?v=' . time()); ?>" rel="stylesheet">
+<link href="<?= legacy_base_url('assets/css/stock.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
 <main class="admin-main stock-page">
   <header class="stock-hero premium-card">
     <button class="sidebar-toggle stock-menu-btn" id="sidebarToggle"><i class="bi bi-list"></i></button>

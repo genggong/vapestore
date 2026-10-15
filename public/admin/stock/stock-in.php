@@ -39,7 +39,7 @@ if (is_post()) {
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link href="<?= base_url('assets/css/stock.css?v=' . time()); ?>" rel="stylesheet">
+<link href="<?= base_url('assets/css/stock.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
 <main class="admin-main">
 <header class="admin-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Stok Masuk</h1><p>Tambah stok barang dari supplier, pembelian, atau restock toko.</p></div></header>
 <section class="premium-card mt-4 stock-form-card"><form method="POST" class="premium-form"><?= CSRF::input(); ?><div class="form-grid"><div class="form-group"><label>Produk</label><select name="product_id" required><option value="">Pilih produk</option><?php foreach($products as $p): ?><option value="<?= e($p['id']); ?>" <?= $productId===(int)$p['id']?'selected':''; ?>><?= e($p['name']); ?> — <?= e($p['product_code']); ?> | Stok <?= e($p['stock']); ?> <?= e($p['unit']); ?></option><?php endforeach; ?></select></div><div class="form-group"><label>Jumlah Masuk</label><input type="number" min="1" name="qty" required placeholder="Contoh: 24"></div><div class="form-group form-wide"><label>Catatan</label><textarea name="note" rows="4" placeholder="Contoh: Restock dari supplier / pembelian barang"></textarea></div></div><div class="form-actions"><a class="btn-soft" href="<?= base_url('admin/stock/index.php'); ?>">Batal</a><button class="btn-premium"><i class="bi bi-box-arrow-in-down"></i> Simpan Stok Masuk</button></div></form></section>

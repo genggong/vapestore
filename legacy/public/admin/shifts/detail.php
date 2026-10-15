@@ -34,7 +34,7 @@ $transactions = $stmt->fetchAll();
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link href="<?= legacy_base_url('assets/css/shifts.css?v=' . time()); ?>" rel="stylesheet">
+<link href="<?= legacy_base_url('assets/css/shifts.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
 
 <main class="admin-main shifts-page">
     <header class="admin-topbar page-topbar">

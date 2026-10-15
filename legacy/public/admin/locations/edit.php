@@ -19,7 +19,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 }
 require_once __DIR__.'/../../layouts/admin-header.php'; require_once __DIR__.'/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/system.css?v=' . time()); ?>"><link rel="stylesheet" href="<?= legacy_base_url('assets/css/locations.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/system.css?v=' . APP_ASSET_VERSION); ?>"><link rel="stylesheet" href="<?= legacy_base_url('assets/css/locations.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main system-wrap"><header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Atur Lokasi Barang</h1><p><?= e($product['name']); ?> • <?= e($product['product_code']?:'-'); ?></p></div></header>
 <form method="POST" class="system-form-card"><?= CSRF::input(); ?><input type="hidden" name="product_id" value="<?= e($productId); ?>">
 <div class="location-edit-head"><span class="location-detail-thumb"><?php if(!empty($product['image'])): ?><img loading="lazy" src="<?= legacy_base_url($product['image']); ?>"><?php else: ?><i class="bi bi-box-seam"></i><?php endif; ?></span><div><h2><?= e($product['name']); ?></h2><p>Kode: <?= e($product['product_code']?:'-'); ?> • Barcode: <?= e($product['barcode']?:'-'); ?></p></div></div>

@@ -32,7 +32,7 @@ if (is_post()) {
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/stock-opname.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/stock-opname.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main stock-opname-page">
     <header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Buat Stock Opname</h1><p>Buat sesi audit stok. Data produk aktif akan disalin ke draft opname.</p></div></header>
     <section class="opname-card">

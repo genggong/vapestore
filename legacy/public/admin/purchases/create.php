@@ -220,7 +220,7 @@ if (is_post()) {
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/purchases.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/purchases.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main purchases-wrap">
 <header class="admin-topbar page-topbar">
     <button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button>
@@ -242,5 +242,5 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 <div class="form-group form-wide"><label>Catatan</label><textarea name="note" rows="4" placeholder="Catatan pembelian / tempo / supplier"></textarea></div>
 <div class="form-actions"><a class="btn-soft" href="<?= legacy_base_url('admin/purchases/index.php'); ?>">Batal</a><button class="btn-premium"><i class="bi bi-save"></i> Simpan Pembelian</button></div>
 </form></section></main>
-<script src="<?= legacy_base_url('assets/js/purchases.js?v=' . time()); ?>"></script>
+<script src="<?= legacy_base_url('assets/js/purchases.js?v=' . APP_ASSET_VERSION); ?>"></script>
 <?php require_once __DIR__ . '/../../layouts/admin-footer.php'; ?>

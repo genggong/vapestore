@@ -55,9 +55,9 @@ $isEdit = false;
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/system.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/bundles.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/sweetalert-theme.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/system.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/bundles.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/sweetalert-theme.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main system-wrap">
 <header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Tambah Paket Produk</h1><p>Buat paket dari beberapa produk satuan.</p></div></header>
 <?php require __DIR__ . '/_form.php'; ?>

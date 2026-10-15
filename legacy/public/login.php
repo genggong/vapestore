@@ -50,7 +50,7 @@ $error = flash('error');
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
-    <link href="<?= legacy_base_url('assets/css/login.css?v=' . time()); ?>" rel="stylesheet">
+    <link href="<?= legacy_base_url('assets/css/login.css?v=' . APP_ASSET_VERSION); ?>" rel="stylesheet">
     <link href="<?= legacy_base_url('assets/css/marketplace-internal-theme.css?v=15.8.0'); ?>" rel="stylesheet">
 </head>
 <body class="<?= $marketplaceThemeSync ? 'login-marketplace-sync' : ''; ?>" data-marketplace-theme-sync="<?= $marketplaceThemeSync ? 'on' : 'off'; ?>">
@@ -111,7 +111,7 @@ $error = flash('error');
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
-<script src="<?= legacy_base_url('assets/js/sweetalert.js?v=' . time()); ?>"></script>
+<script src="<?= legacy_base_url('assets/js/sweetalert.js?v=' . APP_ASSET_VERSION); ?>"></script>
 <script>
 document.getElementById('togglePassword').addEventListener('click', function () {
     const input = document.getElementById('passwordInput');

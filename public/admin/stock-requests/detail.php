@@ -48,7 +48,7 @@ $items = $stmt->fetchAll();
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/warehouse.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/warehouse.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main warehouse-wrap">
 <header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Detail Request Stock</h1><p><?= e($request['request_number']); ?> • <?= e($request['branch_name']); ?></p></div><div class="topbar-actions"><a class="btn-premium outline" href="<?= base_url('admin/stock-requests/index.php'); ?>"><i class="bi bi-arrow-left"></i> Kembali</a></div></header>
 

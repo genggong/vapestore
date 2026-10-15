@@ -21,8 +21,8 @@ $exec=[$branchId]; if($branchId>0)$exec[]=$branchId; $exec=array_merge($exec,$pa
 $stmt=$db->prepare($sql); $stmt->execute($exec); $rows=$stmt->fetchAll(); $branches=location_branch_options($db);
 require_once __DIR__.'/../../layouts/admin-header.php'; require_once __DIR__.'/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/system.css?v=' . time()); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/css/locations.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/system.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/locations.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main system-wrap">
 <header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Rak / Lokasi Barang</h1><p>Atur posisi barang supaya stok opname dan pencarian produk lebih cepat.</p></div><div class="topbar-actions"><a href="<?= base_url('admin/locations/bulk.php?branch_id='.$branchId); ?>" class="system-btn soft"><i class="bi bi-pencil-square"></i> Input Cepat</a></div></header>
 <section class="location-stats">

@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/asset_helpers.php';
+
 function app_config(string $key, $default = null)
 {
     static $config = null;

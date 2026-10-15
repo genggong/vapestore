@@ -29,7 +29,7 @@ $summary = [
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/stock-opname.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/stock-opname.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main stock-opname-page">
     <header class="admin-topbar page-topbar">
         <button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button>

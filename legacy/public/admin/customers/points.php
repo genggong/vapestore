@@ -44,7 +44,7 @@ $totalActive = (int) $db->query("SELECT COALESCE(SUM(points),0) FROM customers W
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/customers.css?v=' . time()); ?>">
+<link rel="stylesheet" href="<?= legacy_base_url('assets/css/customers.css?v=' . APP_ASSET_VERSION); ?>">
 
 <main class="admin-main customer-wrap member-points-page">
     <header class="admin-topbar page-topbar">
