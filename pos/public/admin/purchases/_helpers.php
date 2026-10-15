@@ -1,5 +1,14 @@
 <?php
 
+// V17.0.12: fungsi helper rata-rata tertimbang HPP (share antara purchase & stock-request)
+function avg_hpp(float $oldStock, float $oldPrice, float $newQty, float $newPrice): float
+{
+    if ($newQty <= 0) return $oldPrice;                    // tidak ada barang masuk -> HPP tetap
+    $total = $oldStock + $newQty;
+    if ($oldStock <= 0 || $oldPrice <= 0) return $newPrice; // stok lama kosong/tanpa harga -> pakai harga baru
+    return round(($oldStock * $oldPrice + $newQty * $newPrice) / $total, 2);
+}
+
 function purchases_table_exists(PDO $db, string $table): bool
 {
     $allowed = ['purchases', 'purchase_items', 'products', 'suppliers', 'stock_movements', 'finance_transactions', 'finance_categories', 'debts'];

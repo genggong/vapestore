@@ -5,28 +5,51 @@ Auth::requireRole(['super_admin','owner']);
 require_once __DIR__ . '/_helpers.php';
 require_once __DIR__ . '/../branches/_helpers.php';
 require_once __DIR__ . '/../warehouse/_helpers.php';
+require_once __DIR__ . '/../../../app/Modules/CatalogFast.php';
 $pageTitle = 'Buat Pembelian';
 $db = Database::connect();
 branch_install($db);
 purchases_install($db);
 warehouse_install($db);
+// Semua installer yang berisi DDL wajib selesai sebelum beginTransaction().
+// Ini penting untuk pembelian produk varian karena MySQL melakukan implicit COMMIT pada DDL.
+if (function_exists('marketplace_v16_install')) marketplace_v16_install($db);
 
 $suppliers = $db->query("SELECT id,name FROM suppliers WHERE is_active=1 ORDER BY name ASC")->fetchAll();
 $warehouses = warehouse_all($db, true);
 $branches = branch_all($db, true);
 $defaultWarehouseId = warehouse_main_id($db);
 $defaultDestination = (($_GET['destination'] ?? '') === 'branch') ? ('branch:' . branch_current_id($db)) : ('warehouse:' . $defaultWarehouseId);
-$products = $db->query("SELECT id,name,product_code,barcode,stock,unit,purchase_price FROM products WHERE is_active=1 ORDER BY name ASC")->fetchAll();
-$productOptions=[];
-foreach($products as $p){
-    $vars=marketplace_v15_variants($db,(int)$p['id'],null,true);
-    if($vars){
-        foreach($vars as $v){
-            $productOptions[]=['product_id'=>(int)$p['id'],'variant_id'=>(int)$v['id'],'label'=>$p['name'].' - '.($v['display_name']??$v['name']),'code'=>$v['sku']?:$p['product_code'],'barcode'=>$v['barcode']?:$p['barcode'],'stock'=>(int)($v['stock']??0),'unit'=>$p['unit'],'purchase_price'=>(float)($v['purchase_price']?:$p['purchase_price'])];
+$products = $db->query("SELECT id,name,product_code,barcode,stock,unit,purchase_price FROM products WHERE is_active=1 ORDER BY name ASC")->fetchAll() ?: [];
+$productIds = array_map(fn($row)=>(int)$row['id'], $products);
+$variantsByProduct = catalog_fast_variants_by_product($db, $productIds, branch_current_id($db), true);
+$productGroups = [];
+foreach ($products as $p) {
+    $group = ['parent'=>$p,'options'=>[]];
+    $vars = $variantsByProduct[(int)$p['id']] ?? [];
+    if ($vars) {
+        foreach ($vars as $v) {
+            $group['options'][] = [
+                'product_id'=>(int)$p['id'],
+                'variant_id'=>(int)$v['id'],
+                'parent_name'=>(string)$p['name'],
+                'variant_name'=>(string)($v['display_name'] ?? $v['name'] ?? 'Varian'),
+                'label'=>(string)($v['display_name'] ?? $v['name'] ?? 'Varian'),
+                'code'=>(string)(($v['sku'] ?? '') ?: $p['product_code']),
+                'barcode'=>(string)(($v['barcode'] ?? '') ?: $p['barcode']),
+                'stock'=>(int)($v['stock'] ?? 0),
+                'unit'=>$p['unit'],
+                'purchase_price'=>(float)((float)($v['purchase_price'] ?? 0) > 0 ? $v['purchase_price'] : $p['purchase_price']),
+            ];
         }
     } else {
-        $productOptions[]=['product_id'=>(int)$p['id'],'variant_id'=>0,'label'=>$p['name'],'code'=>$p['product_code'],'barcode'=>$p['barcode'],'stock'=>(int)$p['stock'],'unit'=>$p['unit'],'purchase_price'=>(float)$p['purchase_price']];
+        $group['options'][] = [
+            'product_id'=>(int)$p['id'],'variant_id'=>0,'parent_name'=>(string)$p['name'],'variant_name'=>'','label'=>'Produk induk / tanpa varian',
+            'code'=>$p['product_code'],'barcode'=>$p['barcode'],'stock'=>(int)$p['stock'],
+            'unit'=>$p['unit'],'purchase_price'=>(float)$p['purchase_price']
+        ];
     }
+    $productGroups[] = $group;
 }
 
 
@@ -88,6 +111,7 @@ if (is_post()) {
 
     try {
         $db->beginTransaction();
+        if (!$db->inTransaction()) throw new RuntimeException('Transaksi database pembelian gagal dimulai.');
         $purchaseNumber = purchases_number($db);
         $subtotal = 0;
         $productCache = [];
@@ -120,34 +144,56 @@ if (is_post()) {
         foreach ($items as $item) {
             $cache=$productCache[$item['product_id'].':'.$item['variant_id']];$product=$cache['product'];$variant=$cache['variant'];$variantId=(int)$item['variant_id'];$variantName=$variant['name']??null;$variantSku=$variant['sku']??null;
             $lineTotal = (int)$item['qty'] * (float)$item['price'];
+            $qty=(int)$item['qty'];$newPrice=(float)$item['price'];
             $before = 0;
-            $after = 0;
+            $oldPrice = (float)($variant && (float)$variant['purchase_price']>0 ? $variant['purchase_price'] : $product['purchase_price']);
 
-            // Harga modal produk selalu mengikuti harga beli supplier terakhir.
-            $db->prepare("UPDATE products SET purchase_price=?, updated_at=NOW() WHERE id=?")->execute([$item['price'], $item['product_id']]);
+            // Ambil stok & HPP lama di tujuan untuk menghitung HPP rata-rata tertimbang
+            if ($destinationType === 'warehouse') {
+                if($variantId>0){
+                    $ws=warehouse_variant_stock($db,$destinationId,(int)$item['product_id'],$variantId,true);$before=(int)$ws['stock'];
+                    if((float)($ws['purchase_price']??0)>0)$oldPrice=(float)$ws['purchase_price'];
+                } else {
+                    $ws=warehouse_stock($db,$destinationId,(int)$item['product_id'],true);$before=(int)$ws['stock'];
+                    if((float)($ws['purchase_price']??0)>0)$oldPrice=(float)$ws['purchase_price'];
+                }
+            } else {
+                if($variantId>0){
+                    $before=marketplace_v16_variant_stock($db,$variantId,$destinationId,true);
+                } else {
+                    branch_sync_product($db,(int)$item['product_id']);$bs=branch_stock($db,$destinationId,(int)$item['product_id']);$before=(int)$bs['stock'];
+                }
+            }
+            $after=$before+$qty;
+            // V17.0.12: HPP rata-rata tertimbang (stok lama x harga lama + qty x harga baru) / total stok
+            $avgPrice = avg_hpp((float)$before, $oldPrice, (float)$qty, $newPrice);
+
+            // Update master HPP (produk induk & varian) dengan harga rata-rata
+            $db->prepare("UPDATE products SET purchase_price=?, updated_at=NOW() WHERE id=?")->execute([$avgPrice, $item['product_id']]);
+            if ($variantId > 0) {
+                $db->prepare("UPDATE marketplace_product_variants SET purchase_price=?, updated_at=NOW() WHERE id=? AND product_id=?")
+                    ->execute([$avgPrice, $variantId, $item['product_id']]);
+            }
 
             if ($destinationType === 'warehouse') {
                 if($variantId>0){
-                    $ws=warehouse_variant_stock($db,$destinationId,(int)$item['product_id'],$variantId,true);$before=(int)$ws['stock'];$after=$before+(int)$item['qty'];
-                    warehouse_set_variant_stock($db,$destinationId,(int)$item['product_id'],$variantId,$after,(float)$item['price'],(int)($ws['minimum_stock']??0));
+                    warehouse_set_variant_stock($db,$destinationId,(int)$item['product_id'],$variantId,$after,$avgPrice,(int)($ws['minimum_stock']??0));
                 } else {
-                    $ws = warehouse_stock($db, $destinationId, (int)$item['product_id'], true);$before=(int)$ws['stock'];$after=$before+(int)$item['qty'];
-                    $db->prepare("UPDATE warehouse_stocks SET stock=?,purchase_price=?,minimum_stock=?,updated_at=NOW() WHERE warehouse_id=? AND product_id=?")->execute([$after,$item['price'],(int)$product['minimum_stock'],$destinationId,$item['product_id']]);
+                    $db->prepare("UPDATE warehouse_stocks SET stock=?,purchase_price=?,minimum_stock=?,updated_at=NOW() WHERE warehouse_id=? AND product_id=?")->execute([$after,$avgPrice,(int)$product['minimum_stock'],$destinationId,$item['product_id']]);
                 }
-                warehouse_record_movement($db,$destinationId,(int)$item['product_id'],'supplier_purchase_in',(int)$item['qty'],$before,$after,(float)$item['price'],'purchase',$purchaseId,'Pembelian supplier '.$purchaseNumber.($variantName?' • '.$variantName:''));
+                warehouse_record_movement($db,$destinationId,(int)$item['product_id'],'supplier_purchase_in',$qty,$before,$after,$avgPrice,'purchase',$purchaseId,'Pembelian supplier '.$purchaseNumber.($variantName?' • '.$variantName:''));
             } else {
                 if($variantId>0){
-                    $before=marketplace_v16_variant_stock($db,$variantId,$destinationId,true);$after=$before+(int)$item['qty'];marketplace_v16_set_variant_stock($db,$variantId,$destinationId,$after,0);marketplace_v16_sync_parent_stock($db,(int)$item['product_id'],$destinationId);
+                    marketplace_v16_set_variant_stock($db,$variantId,$destinationId,$after,0);marketplace_v16_sync_parent_stock($db,(int)$item['product_id'],$destinationId);
                 } else {
-                    branch_sync_product($db,(int)$item['product_id']);$bs=branch_stock($db,$destinationId,(int)$item['product_id']);$before=(int)$bs['stock'];$after=$before+(int)$item['qty'];
                     $db->prepare("UPDATE product_branch_stocks SET stock=?,minimum_stock=?,updated_at=NOW() WHERE branch_id=? AND product_id=?")->execute([$after,(int)$product['minimum_stock'],$destinationId,$item['product_id']]);
                     $mainStmt=$db->prepare("SELECT is_main FROM branches WHERE id=? LIMIT 1");$mainStmt->execute([$destinationId]);if((int)$mainStmt->fetchColumn()===1)$db->prepare("UPDATE products SET stock=?,updated_at=NOW() WHERE id=?")->execute([$after,$item['product_id']]);
                 }
-                $db->prepare("INSERT INTO stock_movements (product_id,user_id,branch_id,type,qty,stock_before,stock_after,reference_type,reference_id,note) VALUES (?,?,?,?,?,?,?,?,?,?)")->execute([$item['product_id'],Auth::id(),$destinationId,'stock_in',$item['qty'],$before,$after,'purchase',$purchaseId,'Pembelian supplier '.$purchaseNumber.($variantName?' • '.$variantName:'')]);
+                $db->prepare("INSERT INTO stock_movements (product_id,user_id,branch_id,type,qty,stock_before,stock_after,reference_type,reference_id,note) VALUES (?,?,?,?,?,?,?,?,?,?)")->execute([$item['product_id'],Auth::id(),$destinationId,'stock_in',$qty,$before,$after,'purchase',$purchaseId,'Pembelian supplier '.$purchaseNumber.($variantName?' • '.$variantName:'')]);
             }
 
             $db->prepare("INSERT INTO purchase_items (purchase_id,product_id,variant_id,product_name,variant_name,variant_sku,product_code,unit,qty,purchase_price,line_total,stock_before,stock_after) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute([$purchaseId,$item['product_id'],$variantId?:null,$product['name'],$variantName,$variantSku,$variantSku?:$product['product_code'],$product['unit'],$item['qty'],$item['price'],$lineTotal,$before,$after]);
+                ->execute([$purchaseId,$item['product_id'],$variantId?:null,$product['name'],$variantName,$variantSku,$variantSku?:$product['product_code'],$product['unit'],$qty,$newPrice,$lineTotal,$before,$after]);
         }
 
         if ($paidAmount > 0) {
@@ -158,6 +204,9 @@ if (is_post()) {
         }
         purchases_create_notification($db, 'Pembelian tersimpan', 'Pembelian ' . $purchaseNumber . ' berhasil dibuat.', 'success');
         Auth::log('create_purchase', 'Membuat pembelian ' . $purchaseNumber . ' ke ' . $destinationType);
+        if (!$db->inTransaction()) {
+            throw new RuntimeException('Transaksi database terputus sebelum commit. Jalankan Upgrade Sistem v17.0.8 lalu ulangi setelah memastikan pembelian ini belum tercatat.');
+        }
         $db->commit();
         flash('success','Pembelian berhasil dibuat dan stok tujuan otomatis bertambah.');
         redirect('admin/purchases/detail.php?id=' . $purchaseId);
@@ -187,8 +236,8 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
     <div class="form-group"><label>Invoice Supplier</label><input name="supplier_invoice" placeholder="Contoh: INV-SUP-001"></div>
     <div class="form-group"><label>Status Pembayaran</label><select name="payment_status" id="paymentStatus"><option value="paid">Lunas</option><option value="debt">Hutang / Tempo</option></select></div>
 </div>
-<div class="purchase-items-head"><div><h3>Item Pembelian</h3><p>Pilih produk, masukkan qty dan harga beli supplier.</p></div><button type="button" class="btn-soft" id="addPurchaseItem"><i class="bi bi-plus-circle"></i> Tambah Item</button></div>
-<div class="purchase-items" id="purchaseItems"><div class="purchase-item-row"><div class="form-group item-product"><label>Produk</label><select name="item_key[]" class="purchase-product" required><option value="">Pilih produk / varian</option><?php foreach($productOptions as $p): ?><option value="<?= e($p['product_id'].':'.$p['variant_id']); ?>" data-price="<?= e($p['purchase_price']); ?>" data-stock="<?= e($p['stock']); ?>" data-unit="<?= e($p['unit']); ?>" data-code="<?= e($p['code'] ?? ''); ?>" data-barcode="<?= e($p['barcode'] ?? ''); ?>"><?= e($p['label']); ?> — <?= e($p['code']); ?><?= !empty($p['barcode']) ? ' • ' . e($p['barcode']) : ''; ?> | Modal <?= rupiah($p['purchase_price']); ?></option><?php endforeach; ?></select></div><div class="form-group"><label>Qty</label><input type="number" min="1" name="qty[]" class="purchase-qty" value="1" required></div><div class="form-group"><label>Harga Beli</label><input type="number" min="0" step="0.01" name="purchase_price[]" class="purchase-price" value="0" required></div><button type="button" class="remove-purchase-item"><i class="bi bi-trash"></i></button></div></div>
+<div class="purchase-items-head"><div><h3>Item Pembelian</h3><p>Pilih produk induk lalu variannya, masukkan qty dan harga beli supplier.</p></div><button type="button" class="btn-soft" id="addPurchaseItem"><i class="bi bi-plus-circle"></i> Tambah Item</button></div>
+<div class="purchase-items" id="purchaseItems"><div class="purchase-item-row"><div class="form-group item-product"><label>Produk</label><select name="item_key[]" class="purchase-product" required><option value="">Pilih produk induk + varian</option><?php foreach($productGroups as $group): $parent=$group['parent']; ?><optgroup label="<?= e($parent['name']); ?>"><?php foreach($group['options'] as $p): ?><option value="<?= e($p['product_id'].':'.$p['variant_id']); ?>" data-parent="<?= e($p['parent_name'] ?? $parent['name']); ?>" data-variant="<?= e($p['variant_name'] ?? ''); ?>" data-price="<?= e($p['purchase_price']); ?>" data-stock="<?= e($p['stock']); ?>" data-unit="<?= e($p['unit']); ?>" data-code="<?= e($p['code'] ?? ''); ?>" data-barcode="<?= e($p['barcode'] ?? ''); ?>"><?= e($p['parent_name']); ?><?= $p['variant_id'] ? ' — Varian: '.e($p['variant_name']) : ' — Produk tanpa varian'; ?><?= !empty($p['barcode']) ? ' • Barcode: '.e($p['barcode']) : ''; ?><?= !empty($p['code']) ? ' • Kode: '.e($p['code']) : ''; ?> | Modal <?= rupiah($p['purchase_price']); ?></option><?php endforeach; ?></optgroup><?php endforeach; ?></select><small class="purchase-picker-hint">Produk dengan varian wajib pilih variannya. Nama produk induk tetap ditampilkan di hasil pencarian.</small></div><div class="form-group"><label>Qty</label><input type="number" min="1" name="qty[]" class="purchase-qty" value="1" required></div><div class="form-group"><label>Harga Beli</label><input type="number" min="0" step="0.01" name="purchase_price[]" class="purchase-price" value="0" required></div><button type="button" class="remove-purchase-item"><i class="bi bi-trash"></i></button></div></div>
 <div class="purchase-total-panel"><div class="form-group"><label>Diskon</label><input type="number" min="0" step="0.01" name="discount" id="discount" value="0"></div><div class="form-group"><label>Ongkir / Biaya</label><input type="number" min="0" step="0.01" name="shipping_cost" id="shippingCost" value="0"></div><div class="form-group paid-field"><label>Dibayar</label><input type="number" min="0" step="0.01" name="paid_amount" id="paidAmount" value="0"><small>Jika status hutang, isi nominal yang sudah dibayar.</small></div><div class="purchase-total-box"><span>Grand Total</span><strong id="grandTotalText">Rp 0</strong><small id="debtText">Sisa hutang: Rp 0</small></div></div>
 <div class="form-group form-wide"><label>Catatan</label><textarea name="note" rows="4" placeholder="Catatan pembelian / tempo / supplier"></textarea></div>
 <div class="form-actions"><a class="btn-soft" href="<?= base_url('admin/purchases/index.php'); ?>">Batal</a><button class="btn-premium"><i class="bi bi-save"></i> Simpan Pembelian</button></div>

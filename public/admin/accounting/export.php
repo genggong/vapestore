@@ -42,8 +42,9 @@ if ($format === 'xlsx') {
         ['', '', '', ''],
         [['value' => 'Penjualan Bruto', 'style' => 7], ['value' => $summary['gross_sales'], 'type' => 'number', 'style' => 8], ['value' => 'Retur Penjualan', 'style' => 7], ['value' => $summary['refunds'], 'type' => 'number', 'style' => 8]],
         [['value' => 'Penjualan Bersih', 'style' => 7], ['value' => $summary['net_sales'], 'type' => 'number', 'style' => 8], ['value' => 'Harga Pokok (HPP)', 'style' => 7], ['value' => $summary['cogs'], 'type' => 'number', 'style' => 8]],
-        [['value' => 'Laba Kotor', 'style' => 7], ['value' => $summary['gross_profit'], 'type' => 'number', 'style' => 8], ['value' => 'Beban Operasional', 'style' => 7], ['value' => $summary['operating_expense'], 'type' => 'number', 'style' => 8]],
-        [['value' => 'Pemasukan Lain', 'style' => 7], ['value' => $summary['other_income'], 'type' => 'number', 'style' => 8], ['value' => 'Laba Bersih', 'style' => 7], ['value' => $summary['net_profit'], 'type' => 'number', 'style' => 8]],
+        [['value' => 'Laba Kotor', 'style' => 7], ['value' => $summary['gross_profit'], 'type' => 'number', 'style' => 8], ['value' => 'Pendapatan Ongkir', 'style' => 7], ['value' => $summary['shipping_income'], 'type' => 'number', 'style' => 8]],
+        [['value' => 'Beban Operasional', 'style' => 7], ['value' => $summary['operating_expense'], 'type' => 'number', 'style' => 8], ['value' => 'Pemasukan Lain', 'style' => 7], ['value' => $summary['other_income'], 'type' => 'number', 'style' => 8]],
+        [['value' => 'Laba Bersih', 'style' => 7], ['value' => $summary['net_profit'], 'type' => 'number', 'style' => 8], '', ''],
         [['value' => 'Kas Masuk', 'style' => 7], ['value' => $summary['cash_in'], 'type' => 'number', 'style' => 8], ['value' => 'Kas Keluar', 'style' => 7], ['value' => $summary['cash_out'], 'type' => 'number', 'style' => 8]],
         [['value' => 'Arus Kas Bersih', 'style' => 7], ['value' => $summary['net_cashflow'], 'type' => 'number', 'style' => 8], ['value' => 'Margin Bersih', 'style' => 7], ['value' => round((float)$summary['margin'], 2), 'type' => 'number', 'style' => 4]],
         [['value' => 'Jumlah Transaksi', 'style' => 7], ['value' => (int)$summary['transaction_count'], 'type' => 'number', 'style' => 4], ['value' => 'Rata-rata Transaksi', 'style' => 7], ['value' => $summary['average_transaction'], 'type' => 'number', 'style' => 8]],
@@ -58,7 +59,7 @@ if ($format === 'xlsx') {
         [['value' => 'RINGKASAN PER CABANG', 'style' => 1, 'height' => 28]],
         [['value' => 'Periode ' . $periodText, 'style' => 5]],
         array_map(static fn($h) => ['value' => $h, 'style' => 2], [
-            'Kode', 'Cabang', 'Penjualan Bruto', 'Retur', 'Penjualan Bersih', 'HPP', 'Laba Kotor',
+            'Kode', 'Cabang', 'Penjualan Bruto', 'Retur', 'Penjualan Bersih', 'HPP', 'Laba Kotor', 'Ongkir',
             'Pemasukan Lain', 'Beban Operasional', 'Laba Bersih', 'Kas Masuk', 'Kas Keluar',
             'Arus Kas Bersih', 'Transaksi', 'Rata-rata', 'Margin %', 'Piutang', 'Hutang', 'Nilai Persediaan'
         ]),
@@ -72,6 +73,7 @@ if ($format === 'xlsx') {
             ['value' => $branch['net_sales'], 'type' => 'number', 'style' => 3],
             ['value' => $branch['cogs'], 'type' => 'number', 'style' => 3],
             ['value' => $branch['gross_profit'], 'type' => 'number', 'style' => 3],
+            ['value' => $branch['shipping_income'], 'type' => 'number', 'style' => 3],
             ['value' => $branch['other_income'], 'type' => 'number', 'style' => 3],
             ['value' => $branch['operating_expense'], 'type' => 'number', 'style' => 3],
             ['value' => $branch['net_profit'], 'type' => 'number', 'style' => 3],

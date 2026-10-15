@@ -143,6 +143,12 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
             <h3><?= rupiah($summary['gross_profit']); ?></h3>
             <small>Penjualan bersih dikurangi HPP</small>
         </article>
+        <article class="accounting-kpi">
+            <div class="icon"><i class="bi bi-truck"></i></div>
+            <span>Pendapatan Ongkir</span>
+            <h3><?= rupiah($summary['shipping_income']); ?></h3>
+            <small>Ongkir penjualan online (dipisah dari laba barang)</small>
+        </article>
         <article class="accounting-kpi featured">
             <div class="icon"><i class="bi bi-piggy-bank"></i></div>
             <span>Laba Bersih</span>
@@ -209,7 +215,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
             <table class="accounting-table">
                 <thead>
                     <tr>
-                        <th>Cabang</th><th>Penjualan Bersih</th><th>Retur</th><th>HPP</th><th>Laba Kotor</th><th>Beban</th><th>Laba Bersih</th><th>Arus Kas</th><th>Margin</th><th class="accounting-no-print">Aksi</th>
+                        <th>Cabang</th><th>Penjualan Bersih</th><th>Retur</th><th>HPP</th><th>Laba Kotor</th><th>Ongkir</th><th>Beban</th><th>Laba Bersih</th><th>Arus Kas</th><th>Margin</th><th class="accounting-no-print">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -222,6 +228,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
                         <td><?= rupiah($branch['refunds']); ?></td>
                         <td><?= rupiah($branch['cogs']); ?></td>
                         <td><?= rupiah($branch['gross_profit']); ?></td>
+                        <td><?= rupiah($branch['shipping_income']); ?></td>
                         <td><?= rupiah($branch['operating_expense']); ?></td>
                         <td><b><?= rupiah($branch['net_profit']); ?></b></td>
                         <td><b><?= rupiah($branch['net_cashflow']); ?></b></td>
@@ -247,7 +254,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
         </div>
         <div class="accounting-table-wrap">
             <table class="accounting-table accounting-daily-table">
-                <thead><tr><th>Tanggal</th><th>Transaksi</th><th>Penjualan</th><th>Retur</th><th>HPP</th><th>Laba Kotor</th><th>Beban</th><th>Laba Bersih</th><th>Arus Kas</th></tr></thead>
+                <thead><tr><th>Tanggal</th><th>Transaksi</th><th>Penjualan</th><th>Retur</th><th>HPP</th><th>Laba Kotor</th><th>Ongkir</th><th>Beban</th><th>Laba Bersih</th><th>Arus Kas</th></tr></thead>
                 <tbody>
                 <?php foreach (array_reverse($report['daily']) as $day): ?>
                     <tr>
@@ -257,6 +264,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
                         <td><?= rupiah($day['refunds']); ?></td>
                         <td><?= rupiah($day['cogs']); ?></td>
                         <td><?= rupiah($day['gross_profit']); ?></td>
+                        <td><?= rupiah($day['shipping_income']); ?></td>
                         <td><?= rupiah($day['operating_expense']); ?></td>
                         <td><b><?= rupiah($day['net_profit']); ?></b></td>
                         <td><b><?= rupiah($day['net_cashflow']); ?></b></td>

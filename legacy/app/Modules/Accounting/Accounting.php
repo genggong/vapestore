@@ -411,17 +411,41 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
         }
     }
 
+    // V17.0.16: nilai persediaan disamakan dengan Laporan Stok & Stock Opname —
+    // produk ber-varian yang harga induknya 0 dihitung dari stok & HPP varian
+    // per cabang, sehingga KPI Nilai Persediaan tidak beda dengan Laporan Stok.
     if (accounting_table_exists($db, 'product_branch_stocks') && accounting_table_exists($db, 'products')) {
         $rows = accounting_query($db, "
             SELECT pbs.branch_id,
                    SUM(GREATEST(0, COALESCE(pbs.stock,0)) * COALESCE(p.purchase_price,0)) AS inventory_value
             FROM product_branch_stocks pbs
             JOIN products p ON p.id=pbs.product_id
+            LEFT JOIN (SELECT product_id, COUNT(*) AS variant_count
+                       FROM marketplace_product_variants WHERE is_active=1
+                       GROUP BY product_id) vx ON vx.product_id=p.id
+            WHERE COALESCE(vx.variant_count,0) = 0 OR COALESCE(p.purchase_price,0) > 0
             GROUP BY pbs.branch_id
         ");
         foreach ($rows as $row) {
             $bid = (int)$row['branch_id'];
             if (isset($selectedBranches[$bid])) $selectedBranches[$bid]['inventory_value'] += accounting_number($row['inventory_value']);
+        }
+
+        // Varian produk dengan harga induk 0: nilai = stok varian x HPP varian
+        if (accounting_table_exists($db, 'marketplace_product_variant_stocks') && accounting_table_exists($db, 'marketplace_product_variants')) {
+            $rows = accounting_query($db, "
+                SELECT mvs.branch_id,
+                       SUM(GREATEST(0, COALESCE(mvs.stock,0)) * COALESCE(mv.purchase_price,0)) AS inventory_value
+                FROM marketplace_product_variant_stocks mvs
+                JOIN marketplace_product_variants mv ON mv.id=mvs.variant_id AND mv.is_active=1
+                JOIN products p ON p.id=mv.product_id AND COALESCE(p.purchase_price,0) <= 0
+                WHERE mvs.stock > 0
+                GROUP BY mvs.branch_id
+            ");
+            foreach ($rows as $row) {
+                $bid = (int)$row['branch_id'];
+                if (isset($selectedBranches[$bid])) $selectedBranches[$bid]['inventory_value'] += accounting_number($row['inventory_value']);
+            }
         }
     }
 

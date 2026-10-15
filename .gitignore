@@ -25,3 +25,6 @@ writable/session/*
 writable/debugbar/*
 writable/logs/*
 writable/uploads/*
+# Python
+__pycache__/
+*.pyc

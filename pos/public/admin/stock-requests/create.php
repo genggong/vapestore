@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 require_once __DIR__ . '/../../../app/Modules/Marketplace/Marketplace.php';
 require_once __DIR__ . '/../branches/_helpers.php';
 require_once __DIR__ . '/../warehouse/_helpers.php';
+require_once __DIR__ . '/../../../app/Modules/CatalogFast.php';
 warehouse_require_request_access();
 $pageTitle = 'Buat Request Stock';
 $db = Database::connect();
@@ -82,19 +83,39 @@ if (is_post()) {
     }
 }
 
-$stmt=$db->prepare("SELECT p.id,p.name,p.product_code,p.barcode,p.unit,p.image,c.name category_name,COALESCE(ws.stock,0) warehouse_stock,COALESCE(NULLIF(ws.purchase_price,0),p.purchase_price,0) warehouse_cost FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN warehouse_stocks ws ON ws.product_id=p.id AND ws.warehouse_id=? WHERE p.is_active=1 ORDER BY p.name ASC");
-$stmt->execute([$warehouseId]);$baseProducts=$stmt->fetchAll();$products=[];
+$stmt=$db->prepare("SELECT p.id,p.name,p.product_code,p.barcode,p.unit,c.name category_name,COALESCE(ws.stock,0) warehouse_stock,COALESCE(NULLIF(ws.purchase_price,0),p.purchase_price,0) warehouse_cost,p.purchase_price FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN warehouse_stocks ws ON ws.product_id=p.id AND ws.warehouse_id=? WHERE p.is_active=1 ORDER BY p.name ASC");
+$stmt->execute([$warehouseId]);
+$baseProducts=$stmt->fetchAll() ?: [];
+$productIds=array_map(fn($row)=>(int)$row['id'],$baseProducts);
+$variantsByProduct=catalog_fast_variants_by_product($db,$productIds,branch_current_id($db),true);
+$warehouseVariantMap=catalog_fast_warehouse_variant_stocks($db,$warehouseId,$productIds);
+$productGroups=[];
 foreach($baseProducts as $p){
-    $vars=marketplace_v15_variants($db,(int)$p['id'],null,true);
-    if($vars){foreach($vars as $v){$wvs=warehouse_variant_stock($db,$warehouseId,(int)$p['id'],(int)$v['id']);$r=$p;$r['variant_id']=(int)$v['id'];$r['variant_name']=$v['name'];$r['variant_sku']=$v['sku']??'';$r['name']=$p['name'].' - '.$v['name'];$r['product_code']=$v['sku']?:$p['product_code'];$r['barcode']=$v['barcode']?:$p['barcode'];$r['warehouse_stock']=(int)$wvs['stock'];$r['warehouse_cost']=(float)($wvs['purchase_price']?:($v['purchase_price']?:$p['warehouse_cost']));$products[]=$r;}}
-    else{$p['variant_id']=0;$p['variant_name']='';$p['variant_sku']='';$products[]=$p;}
+    $items=[];
+    $vars=$variantsByProduct[(int)$p['id']] ?? [];
+    if($vars){
+        foreach($vars as $v){
+            $wvs=$warehouseVariantMap[(int)$p['id']][(int)$v['id']] ?? ['stock'=>0,'purchase_price'=>0];
+            $items[]=[
+                'id'=>(int)$p['id'],'parent_name'=>$p['name'],'variant_id'=>(int)$v['id'],'variant_name'=>(string)($v['display_name']??$v['name']),
+                'name'=>$p['name'].' - '.($v['display_name']??$v['name']),'product_code'=>(($v['sku']??'')?:$p['product_code']),
+                'barcode'=>(($v['barcode']??'')?:$p['barcode']),'unit'=>$p['unit'],'category_name'=>$p['category_name'],
+                'warehouse_stock'=>(int)($wvs['stock']??0),
+                'warehouse_cost'=>(float)((float)($wvs['purchase_price']??0)>0?$wvs['purchase_price']:((float)($v['purchase_price']??0)>0?$v['purchase_price']:$p['warehouse_cost']))
+            ];
+        }
+    }else{
+        $items[]=['id'=>(int)$p['id'],'parent_name'=>$p['name'],'variant_id'=>0,'variant_name'=>'','name'=>$p['name'],'product_code'=>$p['product_code'],'barcode'=>$p['barcode'],'unit'=>$p['unit'],'category_name'=>$p['category_name'],'warehouse_stock'=>(int)$p['warehouse_stock'],'warehouse_cost'=>(float)$p['warehouse_cost']];
+    }
+    usort($items,fn($a,$b)=>(((int)$a['warehouse_stock']<=0)<=>((int)$b['warehouse_stock']<=0))?:strnatcasecmp((string)$a['name'],(string)$b['name']));
+    $productGroups[]=['parent'=>$p,'items'=>$items];
 }
-usort($products,fn($a,$b)=>(((int)$a['warehouse_stock']<=0)<=>((int)$b['warehouse_stock']<=0))?:strnatcasecmp($a['name'],$b['name']));
 
 require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
 <link rel="stylesheet" href="<?= base_url('assets/css/warehouse.css?v=' . time()); ?>">
+<style>.request-product-group{border:1px solid #eef2f7;border-radius:18px;overflow:hidden;margin-bottom:12px;background:#fff}.request-parent-heading{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f8fafc;border-bottom:1px solid #eef2f7}.request-parent-heading>i{font-size:20px}.request-parent-heading div{display:grid;gap:2px;flex:1}.request-parent-heading small{font-size:10px;font-weight:900;letter-spacing:.08em;color:#94a3b8}.request-parent-heading b{font-size:13px;color:#0f172a}.request-parent-heading span{font-size:11px;font-weight:900;color:#64748b}.request-product-group .request-product-row{border-radius:0;border:0;border-bottom:1px solid #f1f5f9}.request-product-group .request-product-row:last-child{border-bottom:0}</style>
 <main class="admin-main warehouse-wrap">
 <header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Buat Request Stock</h1><p>Pilih barang seperti POS. Harga otomatis mengikuti modal gudang dari supplier tanpa margin.</p></div><div class="topbar-actions"><a class="btn-premium outline" href="<?= base_url('admin/stock-requests/index.php'); ?>"><i class="bi bi-arrow-left"></i> Kembali</a></div></header>
 
@@ -105,13 +126,18 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
     <section class="request-products-panel">
         <div class="request-search"><i class="bi bi-search"></i><input type="search" id="requestProductSearch" placeholder="Cari nama, kode, barcode, kategori..."></div>
         <div class="request-product-list" id="requestProductList">
-        <?php foreach($products as $p): $stock=(int)$p['warehouse_stock']; $cost=(float)$p['warehouse_cost']; ?>
-            <article class="request-product-row" data-search="<?= e(strtolower($p['name'].' '.$p['product_code'].' '.$p['barcode'].' '.$p['category_name'])); ?>" data-product-id="<?= e($p['id']); ?>" data-variant-id="<?= e($p['variant_id']??0); ?>" data-name="<?= e($p['name']); ?>" data-parent-name="<?= e(preg_replace('/\s+-\s+[^-]+$/','',$p['name'])); ?>" data-code="<?= e($p['product_code']); ?>" data-unit="<?= e($p['unit']); ?>" data-stock="<?= $stock; ?>" data-cost="<?= e($cost); ?>">
-                <div class="request-product-icon"><i class="bi bi-box-seam"></i></div>
-                <div class="request-product-copy"><small><?= e($p['category_name'] ?: 'Produk'); ?></small><h3><?= e($p['name']); ?></h3><p><?= e($p['product_code']); ?><?= $p['barcode'] ? ' • '.e($p['barcode']) : ''; ?></p></div>
-                <div class="request-product-meta"><span class="stock-pill <?= $stock<=0?'out':'ok'; ?>">Gudang <?= $stock; ?> <?= e($p['unit']); ?></span><b><?= rupiah($cost); ?></b><small>modal / <?= e($p['unit']); ?></small></div>
-                <button type="button" class="request-add-btn" <?= $stock<=0?'disabled':''; ?>><i class="bi bi-plus-lg"></i></button>
-            </article>
+        <?php foreach($productGroups as $group): $parent=$group['parent']; ?>
+            <div class="request-product-group" data-product-group>
+                <div class="request-parent-heading"><i class="bi bi-box"></i><div><small>PRODUK INDUK</small><b><?= e($parent['name']); ?></b></div><span><?= count($group['items']); ?> <?= count($group['items'])>1?'varian':'item'; ?></span></div>
+                <?php foreach($group['items'] as $p): $stock=(int)$p['warehouse_stock']; $cost=(float)$p['warehouse_cost']; ?>
+                <article class="request-product-row" data-search="<?= e(strtolower($p['name'].' '.$p['product_code'].' '.$p['barcode'].' '.$p['category_name'])); ?>" data-product-id="<?= e($p['id']); ?>" data-variant-id="<?= e($p['variant_id']??0); ?>" data-name="<?= e($p['name']); ?>" data-parent-name="<?= e($p['parent_name']); ?>" data-code="<?= e($p['product_code']); ?>" data-unit="<?= e($p['unit']); ?>" data-stock="<?= $stock; ?>" data-cost="<?= e($cost); ?>">
+                    <div class="request-product-icon"><i class="bi bi-box-seam"></i></div>
+                    <div class="request-product-copy"><small><?= e($p['variant_name'] ? 'VARIAN • '.$p['variant_name'] : ($p['category_name'] ?: 'Produk induk')); ?></small><h3><?= e($p['name']); ?></h3><p><?= e($p['product_code']); ?><?= $p['barcode'] ? ' • '.e($p['barcode']) : ''; ?></p></div>
+                    <div class="request-product-meta"><span class="stock-pill <?= $stock<=0?'out':'ok'; ?>">Gudang <?= $stock; ?> <?= e($p['unit']); ?></span><b><?= rupiah($cost); ?></b><small>modal / <?= e($p['unit']); ?></small></div>
+                    <button type="button" class="request-add-btn" <?= $stock<=0?'disabled':''; ?>><i class="bi bi-plus-lg"></i></button>
+                </article>
+                <?php endforeach; ?>
+            </div>
         <?php endforeach; ?>
         </div>
     </section>

@@ -151,6 +151,7 @@ function accounting_blank_branch(array $branch): array
         'cogs_returned' => 0.0,
         'cogs' => 0.0,
         'gross_profit' => 0.0,
+        'shipping_income' => 0.0,
         'other_income' => 0.0,
         'operating_expense' => 0.0,
         'net_profit' => 0.0,
@@ -220,6 +221,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
                 'cogs_returned' => 0.0,
                 'cogs' => 0.0,
                 'gross_profit' => 0.0,
+                'shipping_income' => 0.0,
                 'other_income' => 0.0,
                 'operating_expense' => 0.0,
                 'net_profit' => 0.0,
@@ -276,6 +278,21 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
             GROUP BY COALESCE(t.branch_id, {$mainId}), DATE(t.transaction_date)
         ", [$from, $to]);
         foreach ($rows as $row) $addMetric($selectedBranches, $dailyByBranch, $row, 'cogs_sold', 'cogs_sold');
+    }
+
+    // V17.0.11: ongkir (shipping_cost) dipisah sebagai pendapatan tersendiri,
+    // tidak dicampur ke gross profit barang.
+    if (accounting_column_exists($db, 'transactions', 'shipping_cost') && accounting_table_exists($db, 'transactions')) {
+        $rows = accounting_query($db, "
+            SELECT COALESCE(t.branch_id, {$mainId}) AS branch_id,
+                   DATE(t.transaction_date) AS report_date,
+                   SUM(COALESCE(t.shipping_cost,0)) AS shipping_income
+            FROM transactions t
+            WHERE t.status IN ('success','refunded')
+              AND DATE(t.transaction_date) BETWEEN ? AND ?
+            GROUP BY COALESCE(t.branch_id, {$mainId}), DATE(t.transaction_date)
+        ", [$from, $to]);
+        foreach ($rows as $row) $addMetric($selectedBranches, $dailyByBranch, $row, 'shipping_income', 'shipping_income');
     }
 
     if (accounting_table_exists($db, 'sales_returns') && accounting_table_exists($db, 'transactions')) {
@@ -394,25 +411,50 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
         }
     }
 
+    // V17.0.16: nilai persediaan disamakan dengan Laporan Stok & Stock Opname —
+    // produk ber-varian yang harga induknya 0 dihitung dari stok & HPP varian
+    // per cabang, sehingga KPI Nilai Persediaan tidak beda dengan Laporan Stok.
     if (accounting_table_exists($db, 'product_branch_stocks') && accounting_table_exists($db, 'products')) {
         $rows = accounting_query($db, "
             SELECT pbs.branch_id,
                    SUM(GREATEST(0, COALESCE(pbs.stock,0)) * COALESCE(p.purchase_price,0)) AS inventory_value
             FROM product_branch_stocks pbs
             JOIN products p ON p.id=pbs.product_id
+            LEFT JOIN (SELECT product_id, COUNT(*) AS variant_count
+                       FROM marketplace_product_variants WHERE is_active=1
+                       GROUP BY product_id) vx ON vx.product_id=p.id
+            WHERE COALESCE(vx.variant_count,0) = 0 OR COALESCE(p.purchase_price,0) > 0
             GROUP BY pbs.branch_id
         ");
         foreach ($rows as $row) {
             $bid = (int)$row['branch_id'];
             if (isset($selectedBranches[$bid])) $selectedBranches[$bid]['inventory_value'] += accounting_number($row['inventory_value']);
         }
+
+        // Varian produk dengan harga induk 0: nilai = stok varian x HPP varian
+        if (accounting_table_exists($db, 'marketplace_product_variant_stocks') && accounting_table_exists($db, 'marketplace_product_variants')) {
+            $rows = accounting_query($db, "
+                SELECT mvs.branch_id,
+                       SUM(GREATEST(0, COALESCE(mvs.stock,0)) * COALESCE(mv.purchase_price,0)) AS inventory_value
+                FROM marketplace_product_variant_stocks mvs
+                JOIN marketplace_product_variants mv ON mv.id=mvs.variant_id AND mv.is_active=1
+                JOIN products p ON p.id=mv.product_id AND COALESCE(p.purchase_price,0) <= 0
+                WHERE mvs.stock > 0
+                GROUP BY mvs.branch_id
+            ");
+            foreach ($rows as $row) {
+                $bid = (int)$row['branch_id'];
+                if (isset($selectedBranches[$bid])) $selectedBranches[$bid]['inventory_value'] += accounting_number($row['inventory_value']);
+            }
+        }
     }
 
     foreach ($selectedBranches as $branchId => &$branch) {
-        $branch['net_sales'] = $branch['gross_sales'] - $branch['refunds'];
+        // Ongkir dipisah: net_sales & gross_profit = murni barang; ongkir masuk net_profit terpisah
+        $branch['net_sales'] = $branch['gross_sales'] - $branch['shipping_income'] - $branch['refunds'];
         $branch['cogs'] = $branch['cogs_sold'] - $branch['cogs_returned'];
         $branch['gross_profit'] = $branch['net_sales'] - $branch['cogs'];
-        $branch['net_profit'] = $branch['gross_profit'] + $branch['other_income'] - $branch['operating_expense'];
+        $branch['net_profit'] = $branch['gross_profit'] + $branch['shipping_income'] + $branch['other_income'] - $branch['operating_expense'];
         $branch['cash_in'] = $branch['sales_collected'] + $branch['debt_collections'] + $branch['other_income'];
         $branch['cash_out'] = $branch['purchase_paid'] + $branch['refunds'] + $branch['operating_expense'];
         $branch['net_cashflow'] = $branch['cash_in'] - $branch['cash_out'];
@@ -420,10 +462,10 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
         $branch['margin'] = abs($branch['net_sales']) > 0.0001 ? ($branch['net_profit'] / $branch['net_sales']) * 100 : 0.0;
 
         foreach ($dailyByBranch[$branchId] as &$day) {
-            $day['net_sales'] = $day['gross_sales'] - $day['refunds'];
+            $day['net_sales'] = $day['gross_sales'] - $day['shipping_income'] - $day['refunds'];
             $day['cogs'] = $day['cogs_sold'] - $day['cogs_returned'];
             $day['gross_profit'] = $day['net_sales'] - $day['cogs'];
-            $day['net_profit'] = $day['gross_profit'] + $day['other_income'] - $day['operating_expense'];
+            $day['net_profit'] = $day['gross_profit'] + $day['shipping_income'] + $day['other_income'] - $day['operating_expense'];
             $day['cash_in'] = $day['sales_collected'] + $day['debt_collections'] + $day['other_income'];
             $day['cash_out'] = $day['purchase_paid'] + $day['refunds'] + $day['operating_expense'];
             $day['net_cashflow'] = $day['cash_in'] - $day['cash_out'];
@@ -435,7 +477,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
     $summary = accounting_blank_branch(['id' => 0, 'code' => 'ALL', 'name' => 'Semua Cabang', 'is_active' => 1]);
     foreach ($selectedBranches as $branch) {
         foreach ([
-            'gross_sales','refunds','net_sales','cogs_sold','cogs_returned','cogs','gross_profit','other_income',
+            'gross_sales','refunds','net_sales','cogs_sold','cogs_returned','cogs','gross_profit','shipping_income','other_income',
             'operating_expense','net_profit','sales_collected','debt_collections','purchase_paid','cash_in','cash_out',
             'net_cashflow','receivables','payables','inventory_value'
         ] as $metric) {

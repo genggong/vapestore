@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Vapekong System Upgrade / Schema Doctor v17.0.12
+ * Vapekong System Upgrade / Schema Doctor v17.0.16
  * Safe policy: CREATE/ALTER/INDEX only. No DROP/TRUNCATE and no business-row DELETE.
  */
 
@@ -418,7 +418,7 @@ function vk_sys_status(PDO $db): array
 }
 
 /**
- * Ringkasan kesehatan scanner v17.0.12.
+ * Ringkasan kesehatan scanner v17.0.16.
  * Memisahkan masalah inti (DB/routing/asset/checkout) dari peringatan media lama.
  * Tujuannya agar file gambar lama yang hilang tidak lagi dianggap sebagai kegagalan upgrade database.
  */
