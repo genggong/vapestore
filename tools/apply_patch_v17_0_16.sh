@@ -134,6 +134,10 @@ fi
 if ! grep -q 'haveWs < $needWs' legacy/public/admin/warehouse/_helpers.php; then
   echo "!! Marker guard sync warehouse tidak ditemukan — patch tidak terpasang benar."; exit 1
 fi
+# V17.0.16c aset: helper cache-bust + layout harus tanpa ?v=time() (browser cache aset)
+if ! grep -q "APP_ASSET_VERSION" legacy/public/layouts/admin-header.php; then
+  echo "!! Marker cache-bust aset tidak ditemukan — patch JS belum terpasang."; exit 1
+fi
 
 # --- jalankan backfill verifikasi (aman, idempotent) ---
 if [ -f "tools/backfill_v17_0_16.php" ]; then
