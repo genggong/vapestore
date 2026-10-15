@@ -118,6 +118,35 @@ class TestVersi(unittest.TestCase):
         # Catatan historis lama tidak boleh ikut di-rewrite
         self.assertIn('v17.0.12 mempertahankan perbaikan pengambilan ID order', src)
 
+    def test_system_upgrade_module_3_tree(self):
+        for prefix in ('', 'legacy/', 'pos/'):
+            src = read(prefix + 'app/Modules/System/SystemUpgrade.php')
+            self.assertIn('idx_transactions_status_date', src, f'{prefix}: index pendukung akuntansi hilang')
+            self.assertIn('`status`,`transaction_date`', src, f'{prefix}: definisi index salah')
+
+
+class TestDashboardModalKonsisten(unittest.TestCase):
+    def test_dashboard_stock_value_3_tree(self):
+        for name, prefix in TREES.items():
+            src = read(prefix + 'public/admin/dashboard.php')
+            self.assertIn('function dashboard_stock_value', src, f'{name}: helper modal variant-aware hilang')
+            self.assertIn('$stockValue = dashboard_stock_value($db)', src, f'{name}: dashboard belum pakai helper baru')
+
+    def test_no_legacy_helper_di_root_pos_dashboard(self):
+        for prefix in ('', 'pos/'):
+            src = read(prefix + 'public/admin/dashboard.php')
+            self.assertNotIn('legacy_base_url', src)
+            self.assertNotIn('legacy_redirect', src)
+
+
+class TestQueryAkuntansiDioptimasi(unittest.TestCase):
+    def test_date_range_tanpa_fungsi(self):
+        for prefix in ('', 'legacy/', 'pos/'):
+            src = read(prefix + 'app/Modules/Accounting/Accounting.php')
+            # Tidak boleh ada DATE(...) BETWEEN pada transaction_date (menghambat index)
+            self.assertNotRegex(src, r"DATE\(t\.transaction_date\) BETWEEN")
+            self.assertIn('DATE_ADD(?, INTERVAL 1 DAY)', src, f'{prefix}: optimasi range tanggal hilang')
+
 
 class TestCatalogFastTersedia(unittest.TestCase):
     def test_catalog_fast_di_root_pos(self):

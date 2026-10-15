@@ -256,7 +256,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
                    COUNT(*) AS transaction_count
             FROM transactions t
             WHERE t.status IN ('success','refunded')
-              AND DATE(t.transaction_date) BETWEEN ? AND ?
+              AND t.transaction_date >= ? AND t.transaction_date < DATE_ADD(?, INTERVAL 1 DAY)
             GROUP BY COALESCE(t.branch_id, {$mainId}), DATE(t.transaction_date)
         ", [$from, $to]);
         foreach ($rows as $row) {
@@ -274,7 +274,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
             FROM transactions t
             JOIN transaction_items ti ON ti.transaction_id=t.id
             WHERE t.status IN ('success','refunded')
-              AND DATE(t.transaction_date) BETWEEN ? AND ?
+              AND t.transaction_date >= ? AND t.transaction_date < DATE_ADD(?, INTERVAL 1 DAY)
             GROUP BY COALESCE(t.branch_id, {$mainId}), DATE(t.transaction_date)
         ", [$from, $to]);
         foreach ($rows as $row) $addMetric($selectedBranches, $dailyByBranch, $row, 'cogs_sold', 'cogs_sold');
@@ -289,7 +289,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
                    SUM(COALESCE(t.shipping_cost,0)) AS shipping_income
             FROM transactions t
             WHERE t.status IN ('success','refunded')
-              AND DATE(t.transaction_date) BETWEEN ? AND ?
+              AND t.transaction_date >= ? AND t.transaction_date < DATE_ADD(?, INTERVAL 1 DAY)
             GROUP BY COALESCE(t.branch_id, {$mainId}), DATE(t.transaction_date)
         ", [$from, $to]);
         foreach ($rows as $row) $addMetric($selectedBranches, $dailyByBranch, $row, 'shipping_income', 'shipping_income');
@@ -523,7 +523,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
                    COALESCE(NULLIF(TRIM(t.payment_method),''),'other') AS payment_method,
                    SUM(GREATEST(0, LEAST(COALESCE(t.grand_total,0), COALESCE(t.paid_amount,0)-COALESCE(t.change_amount,0)))) AS amount
             FROM transactions t
-            WHERE t.status IN ('success','refunded') AND DATE(t.transaction_date) BETWEEN ? AND ?
+            WHERE t.status IN ('success','refunded') AND t.transaction_date >= ? AND t.transaction_date < DATE_ADD(?, INTERVAL 1 DAY)
             GROUP BY COALESCE(t.branch_id, {$mainId}), COALESCE(NULLIF(TRIM(t.payment_method),''),'other')
         ", [$from, $to]);
         foreach ($rows as $row) {

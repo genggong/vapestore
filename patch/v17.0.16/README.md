@@ -26,6 +26,9 @@
 - `public/admin/stock-requests/action.php` — HPP rata-rata tertimbang saat fulfill
 - `public/admin/stock-requests/{create,index,detail}.php` — display konsisten
 - `public/admin/reports/stock.php` — nilai modal variant-aware
+- `public/admin/dashboard.php` — Nilai Modal Stok dashboard konsisten dgn Laporan Stok (variant-aware)
+- `app/Modules/System/SystemUpgrade.php` — index pendukung `(status, transaction_date)` biar query Akuntansi cepat + versi 17.0.16
+- `app/Modules/Accounting/Accounting.php` — query range tanggal tanpa fungsi `DATE()` (pakai index), ongkir terpisah + inventory variant-aware
 - `app/Modules/CatalogFast.php` — baru untuk root & pos
 - `assets/js/stock-request.js` (+ semua jalur) — sinkron stok gudang di keranjang
 - `tools/backfill_v17_0_16.php` — verifikasi angka (aman diulang, tanpa DDL/backfill harga)

@@ -88,6 +88,7 @@ function vk_sys_expected_indexes(): array
 {
     return [
         'products' => ['idx_products_name','idx_products_stock','idx_products_active','idx_products_brand'],
+        'transactions' => ['idx_transactions_status_date'],
         'transaction_items' => ['idx_transaction_items_transaction','idx_transaction_items_product','idx_transaction_items_variant'],
         'purchase_items' => ['idx_purchase_items_purchase','idx_purchase_items_product','idx_purchase_items_variant'],
         'product_branch_stocks' => ['uniq_product_branch','idx_pbs_stock'],
@@ -612,6 +613,7 @@ function vk_sys_upgrade(PDO $db): array
 
     $indexJobs = [
         ['products','idx_products_brand','`brand_id`',false],
+        ['transactions','idx_transactions_status_date','`status`,`transaction_date`',false],
         ['transaction_items','idx_transaction_items_variant','`variant_id`',false],
         ['purchase_items','idx_purchase_items_variant','`variant_id`',false],
         ['branch_stock_request_items','idx_bsri_variant','`variant_id`',false],

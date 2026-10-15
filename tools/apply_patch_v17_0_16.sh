@@ -40,8 +40,13 @@ legacy/public/assets/js/stock-request.js
 legacy/app/Modules/CatalogFast.php
 legacy/public/admin/system-upgrade/index.php
 legacy/app/Modules/System/SystemUpgrade.php
+legacy/public/admin/dashboard.php
 app/Modules/Accounting/Accounting.php
 app/Modules/CatalogFast.php
+app/Modules/System/SystemUpgrade.php
+public/admin/dashboard.php
+pos/app/Modules/System/SystemUpgrade.php
+pos/public/admin/dashboard.php
 public/admin/accounting/index.php
 public/admin/accounting/export.php
 public/admin/purchases/_helpers.php
@@ -89,10 +94,16 @@ for f in \
   legacy/public/admin/stock-requests/index.php \
   legacy/public/admin/stock-requests/detail.php \
   legacy/public/admin/reports/stock.php \
+  legacy/public/admin/dashboard.php \
   legacy/public/assets/js/stock-request.js \
   legacy/app/Modules/CatalogFast.php \
+  legacy/app/Modules/System/SystemUpgrade.php \
   app/Modules/Accounting/Accounting.php \
   app/Modules/CatalogFast.php \
+  app/Modules/System/SystemUpgrade.php \
+  public/admin/dashboard.php \
+  pos/app/Modules/System/SystemUpgrade.php \
+  pos/public/admin/dashboard.php \
   tools/backfill_v17_0_16.php ; do
   if [ ! -f "$f" ]; then echo "  [MISSING] $f"; OK=0; continue; fi
   if [ ! -s "$f" ]; then echo "  [KOSONG] $f"; OK=0; continue; fi

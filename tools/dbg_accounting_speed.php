@@ -9,23 +9,33 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 $candidates = [
-    __DIR__ . '/../legacy/app/bootstrap.php',
-    __DIR__ . '/legacy/app/bootstrap.php',
-    getcwd() . '/legacy/app/bootstrap.php',
-    getcwd() . '/../legacy/app/bootstrap.php',
     __DIR__ . '/../app/bootstrap.php',
     getcwd() . '/../app/bootstrap.php',
+    getcwd() . '/app/bootstrap.php',
+    __DIR__ . '/app/bootstrap.php',
+    __DIR__ . '/../legacy/app/bootstrap.php',
+    getcwd() . '/../legacy/app/bootstrap.php',
+    getcwd() . '/legacy/app/bootstrap.php',
 ];
 $loaded = false;
 foreach ($candidates as $c) {
     if (file_exists($c)) { require_once $c; $loaded = true; break; }
 }
-if (!$loaded) { fwrite(STDERR, "bootstrap.php tidak ditemukan.\n"); exit(1); }
+if (!$loaded) { fwrite(STDERR, "bootstrap.php tidak ditemukan. Jalankan dari docroot: cd ~/public_html && php tools/dbg_accounting_speed.php\n"); exit(1); }
+// Bootstrap menonaktifkan display_errors jika debug=false — aktifkan lagi utk tool ini.
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
 
-require_once __DIR__ . '/../legacy/app/Modules/Accounting/Accounting.php';
-require_once __DIR__ . '/../legacy/public/admin/branches/_helpers.php';
+// Muat module dari tree yang live dipakai halaman admin (root app/ di hosting).
+$accModule = __DIR__ . '/../app/Modules/Accounting/Accounting.php';
+if (!is_file($accModule)) $accModule = __DIR__ . '/../legacy/app/Modules/Accounting/Accounting.php';
+require_once $accModule;
+$branchHelpers = __DIR__ . '/../public/admin/branches/_helpers.php';
+if (!is_file($branchHelpers)) $branchHelpers = __DIR__ . '/../legacy/public/admin/branches/_helpers.php';
+require_once $branchHelpers;
 
 $db = Database::connect();
+echo "DB OK: " . $db->query("SELECT DATABASE()")->fetchColumn() . "\n";
 
 function bench(PDO $db, string $label, string $sql): void
 {
