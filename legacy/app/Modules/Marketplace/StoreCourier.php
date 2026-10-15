@@ -391,9 +391,10 @@ function marketplace_courier_update_status(PDO $db,int $assignmentId,int $courie
         $db->prepare("UPDATE online_orders SET order_status='shipped',fulfillment_status='shipped',delivery_status=?,shipped_at=COALESCE(shipped_at,NOW()),updated_at=NOW() WHERE id=?")->execute([$deliveryStatus,$orderId]);
     } elseif($tr['to']==='delivered'){
         $db->prepare("UPDATE online_orders SET order_status='completed',fulfillment_status='completed',delivery_status=?,completed_at=COALESCE(completed_at,NOW()),updated_at=NOW() WHERE id=?")->execute([$deliveryStatus,$orderId]);
-        // V17.0.11: catat penjualan online ke transaksi POS (bugfix hilang dari laporan)
+        // V17.0.13: catat penjualan online ke transaksi POS (bugfix hilang dari laporan)
         if (function_exists('marketplace_record_pos_transaction')) {
-            try { marketplace_record_pos_transaction($db,$orderId); } catch (Throwable $ignore) {}
+            try { marketplace_record_pos_transaction($db,$orderId); }
+            catch (Throwable $e) { error_log('[VAPEKONG][pos_record] courier deliver order '.$orderId.' gagal: '.$e->getMessage()); }
         }
     } elseif($tr['to']==='returned') {
         $db->prepare("UPDATE online_orders SET order_status='processing',fulfillment_status='ready_ship',delivery_status=?,shipped_at=NULL,updated_at=NOW() WHERE id=?")->execute([$deliveryStatus,$orderId]);

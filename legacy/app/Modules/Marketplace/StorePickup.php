@@ -203,7 +203,8 @@ function marketplace_store_pickup_complete(PDO $db, int $orderId, string $pickup
             ->execute([$recipient,$note !== '' ? $note : null,$orderId]);
         // V17.0.11: catat penjualan online ke transaksi POS (bugfix hilang dari laporan)
         if (function_exists('marketplace_record_pos_transaction')) {
-            try { marketplace_record_pos_transaction($db,$orderId); } catch (Throwable $ignore) {}
+            try { marketplace_record_pos_transaction($db,$orderId); }
+            catch (Throwable $e) { error_log('[VAPEKONG][pos_record] store_pickup order '.$orderId.' gagal: '.$e->getMessage()); }
         }
         $db->commit();
     } catch (Throwable $e) {

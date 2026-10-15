@@ -1402,7 +1402,6 @@ function marketplace_award_customer_points(PDO $db, int $orderId): int
  */
 function marketplace_record_pos_transaction(PDO $db, int $orderId): ?int
 {
-    marketplace_install($db);
     $started = !$db->inTransaction();
     if ($started) $db->beginTransaction();
     try {

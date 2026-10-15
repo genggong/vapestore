@@ -11,6 +11,34 @@ $orders = $db->query("SELECT o.*, b.name AS branch_name
     LEFT JOIN branches b ON b.id=o.branch_id
     ORDER BY o.id DESC")->fetchAll() ?: [];
 
+// V17.0.13 auto-reconcile: order paid+completed yang belum tercatat POS
+// otomatis direkam setiap halaman dibuka (jaring pengaman bila pemanggil
+// sebelumya gagal diam-diam). Idempotent - aman dipanggil berulang.
+$pending = 0;
+try {
+    $cand = $db->query(
+        "SELECT id FROM online_orders
+         WHERE payment_status='paid' AND order_status='completed' AND pos_recorded_at IS NULL
+         ORDER BY id ASC LIMIT 50"
+    )->fetchAll() ?: [];
+    foreach ($cand as $c) {
+        try {
+            $res = marketplace_record_pos_transaction($db, (int)$c['id']);
+            if ($res !== null) { $pending++; }
+        } catch (Throwable $e) {
+            error_log('[VAPEKONG][pos_record] auto-reconcile order ' . $c['id'] . ' gagal: ' . $e->getMessage());
+        }
+    }
+    if ($pending > 0) {
+        $orders = $db->query("SELECT o.*, b.name AS branch_name
+            FROM online_orders o
+            LEFT JOIN branches b ON b.id=o.branch_id
+            ORDER BY o.id DESC")->fetchAll() ?: [];
+    }
+} catch (Throwable $e) {
+    error_log('[VAPEKONG][pos_record] auto-reconcile error: ' . $e->getMessage());
+}
+
 function marketplace_admin_badge(string $status): string
 {
     $map = [

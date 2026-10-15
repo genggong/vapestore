@@ -167,7 +167,6 @@ if ($promo) {
     <section class="store-container faq-section reveal" id="faq">
         <div class="faq-heading"><span class="eyebrow">PUSAT BANTUAN</span><h2>Pertanyaan yang sering ditanyakan</h2><p>Informasi dasar sebelum checkout. Detail pembayaran dan pengiriman dapat disesuaikan dari sistem.</p></div>
         <div class="faq-list">
-            <details open><summary>Apakah stok marketplace sama dengan stok POS?<i class="bi bi-plus-lg"></i></summary><p>Ya. Katalog membaca produk dan stok dari database POS sehingga perubahan stok di sistem utama ikut tercermin di marketplace.</p></details>
             <details><summary>Bagaimana cara melacak pesanan?<i class="bi bi-plus-lg"></i></summary><p>Buka menu Tracking lalu masukkan nomor invoice atau nomor resi yang diterima.</p></details>
             <details><summary>Apakah harga marketplace mengikuti harga POS?<i class="bi bi-plus-lg"></i></summary><p>Saat ini harga katalog mengambil harga jual produk dari POS. Pengaturan harga online terpisah dapat ditambahkan pada tahap berikutnya.</p></details>
             <details><summary>Apakah bisa checkout dari HP?<i class="bi bi-plus-lg"></i></summary><p>Bisa. Halaman marketplace, keranjang, checkout, dan tracking dibuat responsif untuk ponsel, tablet, dan desktop.</p></details>
