@@ -84,15 +84,34 @@ function branch_install(PDO $db): void
         INDEX idx_pbs_stock (stock)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $db->exec("
-        INSERT IGNORE INTO product_branch_stocks (branch_id, product_id, stock, minimum_stock, created_at)
-        SELECT b.id, p.id,
-               CASE WHEN b.is_main = 1 THEN p.stock ELSE 0 END AS stock,
-               p.minimum_stock,
-               NOW()
-        FROM branches b
-        CROSS JOIN products p
-    ");
+    // V17.0.16c: sync product_branch_stocks DI-GUARD COUNT (lihat fungsi di bawah).
+    // Sebelumnya INSERT IGNORE ... CROSS JOIN products jalan DI SETIAP request admin
+    // (dashboard memanggil branch_install 2x), memproses ribuan baris per halaman.
+    branch_sync_all_product_stocks($db);
+}
+
+/**
+ * V17.0.16c: sync semua baris product_branch_stocks (produk × cabang) — di-guard COUNT.
+ * Jalan sekali saja kalau jumlah baris < produk×cabang; setelah itu dilewati.
+ */
+function branch_sync_all_product_stocks(PDO $db): void
+{
+    try {
+        $need = (int)$db->query("SELECT (SELECT COUNT(*) FROM products) * (SELECT COUNT(*) FROM branches)")->fetchColumn();
+        $have = (int)$db->query("SELECT COUNT(*) FROM product_branch_stocks")->fetchColumn();
+        if ($have >= $need) return;
+        $db->exec("
+            INSERT IGNORE INTO product_branch_stocks (branch_id, product_id, stock, minimum_stock, created_at)
+            SELECT b.id, p.id,
+                   CASE WHEN b.is_main = 1 THEN p.stock ELSE 0 END AS stock,
+                   p.minimum_stock,
+                   NOW()
+            FROM branches b
+            CROSS JOIN products p
+        ");
+    } catch (Throwable $e) {
+        // Tidak boleh menggagalkan halaman karena sync gagal.
+    }
 }
 
 function branch_main_id(PDO $db): int

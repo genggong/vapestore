@@ -188,10 +188,15 @@ function warehouse_install(PDO $db): void
     }
 
     // Buat baris stok gudang untuk semua produk lama tanpa mengubah stok cabang/POS.
+    // V17.0.16c: di-guard COUNT — jangan INSERT IGNORE semua produk tiap request.
     $mainWarehouseId = warehouse_main_id($db);
-    $stmt = $db->prepare("INSERT IGNORE INTO warehouse_stocks (warehouse_id,product_id,stock,minimum_stock,purchase_price,created_at)
-        SELECT ?, p.id, 0, p.minimum_stock, p.purchase_price, NOW() FROM products p");
-    $stmt->execute([$mainWarehouseId]);
+    $haveWs = (int)$db->query("SELECT COUNT(*) FROM warehouse_stocks")->fetchColumn();
+    $needWs = (int)$db->query("SELECT COUNT(*) FROM products")->fetchColumn();
+    if ($haveWs < $needWs) {
+        $stmt = $db->prepare("INSERT IGNORE INTO warehouse_stocks (warehouse_id,product_id,stock,minimum_stock,purchase_price,created_at)
+            SELECT ?, p.id, 0, p.minimum_stock, p.purchase_price, NOW() FROM products p");
+        $stmt->execute([$mainWarehouseId]);
+    }
 }
 
 function warehouse_main_id(PDO $db): int

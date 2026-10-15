@@ -41,12 +41,18 @@ legacy/app/Modules/CatalogFast.php
 legacy/public/admin/system-upgrade/index.php
 legacy/app/Modules/System/SystemUpgrade.php
 legacy/public/admin/dashboard.php
+legacy/public/admin/branches/_helpers.php
+legacy/public/admin/warehouse/_helpers.php
 app/Modules/Accounting/Accounting.php
 app/Modules/CatalogFast.php
 app/Modules/System/SystemUpgrade.php
 public/admin/dashboard.php
+public/admin/branches/_helpers.php
+public/admin/warehouse/_helpers.php
 pos/app/Modules/System/SystemUpgrade.php
 pos/public/admin/dashboard.php
+pos/public/admin/branches/_helpers.php
+pos/public/admin/warehouse/_helpers.php
 public/admin/accounting/index.php
 public/admin/accounting/export.php
 public/admin/purchases/_helpers.php
@@ -95,6 +101,8 @@ for f in \
   legacy/public/admin/stock-requests/detail.php \
   legacy/public/admin/reports/stock.php \
   legacy/public/admin/dashboard.php \
+  legacy/public/admin/branches/_helpers.php \
+  legacy/public/admin/warehouse/_helpers.php \
   legacy/public/assets/js/stock-request.js \
   legacy/app/Modules/CatalogFast.php \
   legacy/app/Modules/System/SystemUpgrade.php \
@@ -102,8 +110,12 @@ for f in \
   app/Modules/CatalogFast.php \
   app/Modules/System/SystemUpgrade.php \
   public/admin/dashboard.php \
+  public/admin/branches/_helpers.php \
+  public/admin/warehouse/_helpers.php \
   pos/app/Modules/System/SystemUpgrade.php \
   pos/public/admin/dashboard.php \
+  pos/public/admin/branches/_helpers.php \
+  pos/public/admin/warehouse/_helpers.php \
   tools/backfill_v17_0_16.php ; do
   if [ ! -f "$f" ]; then echo "  [MISSING] $f"; OK=0; continue; fi
   if [ ! -s "$f" ]; then echo "  [KOSONG] $f"; OK=0; continue; fi
@@ -114,6 +126,13 @@ done
 # --- verifikasi marker source (ongkir terpisah harus ada) ---
 if ! grep -q "shipping_income" legacy/app/Modules/Accounting/Accounting.php; then
   echo "!! Marker shipping_income tidak ditemukan — patch tidak terpasang benar."; exit 1
+fi
+# V17.0.16c: guard sync stok harus ada (kalau tidak, loading admin tetap berat)
+if ! grep -q "branch_sync_all_product_stocks" legacy/public/admin/branches/_helpers.php; then
+  echo "!! Marker guard sync branch tidak ditemukan — patch tidak terpasang benar."; exit 1
+fi
+if ! grep -q 'haveWs < $needWs' legacy/public/admin/warehouse/_helpers.php; then
+  echo "!! Marker guard sync warehouse tidak ditemukan — patch tidak terpasang benar."; exit 1
 fi
 
 # --- jalankan backfill verifikasi (aman, idempotent) ---

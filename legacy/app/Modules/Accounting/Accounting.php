@@ -303,7 +303,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
             FROM sales_returns sr
             JOIN transactions t ON t.id=sr.transaction_id
             WHERE sr.status='completed'
-              AND DATE(sr.return_date) BETWEEN ? AND ?
+              AND sr.return_date >= ? AND sr.return_date < DATE_ADD(?, INTERVAL 1 DAY)
             GROUP BY COALESCE(t.branch_id, {$mainId}), DATE(sr.return_date)
         ", [$from, $to]);
         foreach ($rows as $row) $addMetric($selectedBranches, $dailyByBranch, $row, 'refunds', 'refunds');
@@ -319,7 +319,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
             JOIN sales_return_items sri ON sri.return_id=sr.id
             LEFT JOIN transaction_items ti ON ti.id=sri.transaction_item_id
             WHERE sr.status='completed'
-              AND DATE(sr.return_date) BETWEEN ? AND ?
+              AND sr.return_date >= ? AND sr.return_date < DATE_ADD(?, INTERVAL 1 DAY)
             GROUP BY COALESCE(t.branch_id, {$mainId}), DATE(sr.return_date)
         ", [$from, $to]);
         foreach ($rows as $row) $addMetric($selectedBranches, $dailyByBranch, $row, 'cogs_returned', 'cogs_returned');
@@ -372,7 +372,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
                    DATE(cdp.created_at) AS report_date,
                    SUM(COALESCE(cdp.amount,0)) AS debt_collections
             FROM customer_debt_payments cdp
-            WHERE DATE(cdp.created_at) BETWEEN ? AND ?
+            WHERE cdp.created_at >= ? AND cdp.created_at < DATE_ADD(?, INTERVAL 1 DAY)
             GROUP BY COALESCE(cdp.branch_id, {$mainId}), DATE(cdp.created_at)
         ", [$from, $to]);
         foreach ($rows as $row) $addMetric($selectedBranches, $dailyByBranch, $row, 'debt_collections', 'debt_collections');
@@ -537,7 +537,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
                    COALESCE(NULLIF(TRIM(cdp.payment_method),''),'other') AS payment_method,
                    SUM(COALESCE(cdp.amount,0)) AS amount
             FROM customer_debt_payments cdp
-            WHERE DATE(cdp.created_at) BETWEEN ? AND ?
+            WHERE cdp.created_at >= ? AND cdp.created_at < DATE_ADD(?, INTERVAL 1 DAY)
             GROUP BY COALESCE(cdp.branch_id, {$mainId}), COALESCE(NULLIF(TRIM(cdp.payment_method),''),'other')
         ", [$from, $to]);
         foreach ($rows as $row) {

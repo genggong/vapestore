@@ -132,6 +132,23 @@ try {
     backfill_warn($db, "Verifikasi avg_hpp gagal: " . $e->getMessage());
 }
 
+try {
+    $check = $db->prepare(
+        "SELECT COUNT(*) FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customer_debt_payments' AND INDEX_NAME = 'idx_customer_debt_payments_created'"
+    );
+    $check->execute();
+    if ((int)$check->fetchColumn() > 0) {
+        echo '[OK] Index idx_customer_debt_payments_created sudah ada (created_at).' . PHP_EOL;
+    } else {
+        echo '[..] Memasang index idx_customer_debt_payments_created (created_at) ...' . PHP_EOL;
+        $db->exec("ALTER TABLE customer_debt_payments ADD INDEX idx_customer_debt_payments_created (created_at)");
+        echo '[OK] Index idx_customer_debt_payments_created terpasang.' . PHP_EOL;
+    }
+} catch (Throwable $e) {
+    echo '[WARN] Gagal memasang index customer_debt_payments: ' . $e->getMessage() . PHP_EOL;
+}
+
 echo PHP_EOL . 'Selesai. Nilai modal stok & ongkir kini konsisten di Laporan Stok, Akuntansi, dan Export.' . PHP_EOL;
 
 // ---------------------------------------------------------------------------

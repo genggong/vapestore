@@ -154,6 +154,33 @@ class TestQueryAkuntansiDioptimasi(unittest.TestCase):
             # Tidak boleh ada DATE(...) BETWEEN pada transaction_date (menghambat index)
             self.assertNotRegex(src, r"DATE\(t\.transaction_date\) BETWEEN")
             self.assertIn('DATE_ADD(?, INTERVAL 1 DAY)', src, f'{prefix}: optimasi range tanggal hilang')
+            # Tidak ada sama sekali pola DATE(...) BETWEEN di WHERE (return/cdp ikut dibersihkan)
+            self.assertNotRegex(src, r"DATE\([a-z_]+\) BETWEEN", f'{prefix}: masih ada DATE() BETWEEN')
+
+    def test_semua_date_between_hilang(self):
+        for prefix in ('', 'legacy/', 'pos/'):
+            src = read(prefix + 'app/Modules/Accounting/Accounting.php')
+            self.assertNotIn('DATE(sr.return_date) BETWEEN', src, f'{prefix}: return_date masih DATE() BETWEEN')
+            self.assertNotIn('DATE(cdp.created_at) BETWEEN', src, f'{prefix}: cdp.created_at masih DATE() BETWEEN')
+
+
+class TestGuardSyncStok(unittest.TestCase):
+    def test_branch_sync_guarded_3_tree(self):
+        for name, prefix in TREES.items():
+            src = read(prefix + 'public/admin/branches/_helpers.php')
+            self.assertIn('function branch_sync_all_product_stocks', src, f'{name}: guard sync branch hilang')
+            self.assertIn('$have >= $need', src, f'{name}: guard count branch hilang')
+
+    def test_warehouse_sync_guarded_3_tree(self):
+        for name, prefix in TREES.items():
+            src = read(prefix + 'public/admin/warehouse/_helpers.php')
+            self.assertIn('$haveWs < $needWs', src, f'{name}: guard warehouse hilang')
+
+    def test_dashboard_range_sargable(self):
+        for name, prefix in TREES.items():
+            src = read(prefix + 'public/admin/dashboard.php')
+            self.assertNotIn('DATE(COALESCE(transaction_date, created_at)) = CURDATE()', src, f'{name}: dashboard masih full-scan harian')
+            self.assertIn('transaction_date >= CURDATE()', src, f'{name}: range harian hilang')
 
 
 class TestCatalogFastTersedia(unittest.TestCase):

@@ -79,7 +79,8 @@ function dashboard_daily_summary(PDO $db, int $branchId): array
                 COUNT(*) AS invoice_today
             FROM transactions
             WHERE branch_id = ?
-              AND DATE(COALESCE(transaction_date, created_at)) = CURDATE()
+              AND transaction_date >= CURDATE()
+              AND transaction_date < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
         ");
         $stmt->execute([$branchId]);
         $row = $stmt->fetch() ?: [];
