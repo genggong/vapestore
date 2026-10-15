@@ -55,7 +55,15 @@ class TestInventoryVariantAware(unittest.TestCase):
         for name, prefix in TREES.items():
             src = read(prefix + 'app/Modules/Accounting/Accounting.php')
             self.assertIn('marketplace_product_variant_stocks mvs', src, f'{name}: nilai persediaan belum variant-aware')
-            self.assertIn("COALESCE(p.purchase_price,0) <= 0", src, f'{name}: filter harga induk 0 hilang')
+            # Query ringkas v2: filter harga induk 0 langsung di JOIN, tanpa subquery GROUP BY
+            self.assertIn('p.purchase_price <= 0', src, f'{name}: filter harga induk 0 hilang')
+            self.assertNotIn('LEFT JOIN (SELECT product_id', src, f'{name}: masih pakai subquery GROUP BY (lambat)')
+
+    def test_no_date_function_range(self):
+        for name, prefix in TREES.items():
+            src = read(prefix + 'app/Modules/Accounting/Accounting.php')
+            # Query transaksi harus pakai range bersih supaya index (status, transaction_date) terpakai
+            self.assertIn('DATE_ADD(?, INTERVAL 1 DAY)', src, f'{name}: optimasi range tanggal hilang')
 
 
 class TestAverageHpp(unittest.TestCase):

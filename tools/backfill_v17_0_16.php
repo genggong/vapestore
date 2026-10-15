@@ -133,3 +133,32 @@ try {
 }
 
 echo PHP_EOL . 'Selesai. Nilai modal stok & ongkir kini konsisten di Laporan Stok, Akuntansi, dan Export.' . PHP_EOL;
+
+// ---------------------------------------------------------------------------
+// V17.0.16b — Pastikan index pendukung query Akuntansi ada (idempotent).
+// Tanpa index (status, transaction_date), query range Akuntansi full-scan
+// tiap kali halaman dibuka -> lambat. Script ini memasang lewat ALTER langsung
+// supaya TIDAK bergantung pada tombol 'Jalankan Upgrade Otomatis' di UI.
+// ---------------------------------------------------------------------------
+try {
+    $check = $db->prepare(
+        "SELECT COUNT(*) FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'transactions' AND INDEX_NAME = 'idx_transactions_status_date'"
+    );
+    $check->execute();
+    if ((int)$check->fetchColumn() > 0) {
+        echo '[OK] Index idx_transactions_status_date sudah ada (status, transaction_date).' . PHP_EOL;
+    } else {
+        echo '[..] Memasang index idx_transactions_status_date (status, transaction_date) ...' . PHP_EOL;
+        $db->exec("ALTER TABLE transactions ADD INDEX idx_transactions_status_date (status, transaction_date)");
+        $check->execute();
+        if ((int)$check->fetchColumn() > 0) {
+            echo '[OK] Index idx_transactions_status_date terpasang.' . PHP_EOL;
+        } else {
+            echo '[WARN] Index tidak terdeteksi setelah ALTER. Cek hak akses ALTER user DB.' . PHP_EOL;
+        }
+    }
+} catch (Throwable $e) {
+    echo '[WARN] Gagal memasang index otomatis: ' . $e->getMessage() . PHP_EOL;
+    echo '       Alternatif: buka /admin/system-upgrade/index.php lalu klik "Jalankan Upgrade Otomatis".' . PHP_EOL;
+}

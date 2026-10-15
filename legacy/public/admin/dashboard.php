@@ -27,23 +27,24 @@ function safe_sum(PDO $db, string $table, string $field, string $where = '1=1'):
 // V17.0.16: nilai modal stok dashboard konsisten dgn Laporan Stok & Akuntansi.
 // Produk ber-varian dengan harga induk 0 dihitung dari stok & HPP varian (bukan 0),
 // sehingga total tidak under-report (kasus: Dripstate hb 0 x varian).
+// Versi ringan: TANPA subquery GROUP BY — q1 hanya produk dgn hb>0, q2 hanya varian
+// milik produk hb<=0 (umumnya sedikit). Index products PK & uniq variant_branch cukup.
 function dashboard_stock_value(PDO $db): float {
     $v = 0.0;
     try {
         $v += (float)$db->query(
             "SELECT COALESCE(SUM(GREATEST(0,COALESCE(p.stock,0))*COALESCE(p.purchase_price,0)),0)
              FROM products p
-             LEFT JOIN (SELECT product_id, COUNT(*) c FROM marketplace_product_variants WHERE is_active=1 GROUP BY product_id) vx ON vx.product_id=p.id
-             WHERE COALESCE(vx.c,0)=0 OR COALESCE(p.purchase_price,0)>0"
+             WHERE p.purchase_price > 0"
         )->fetchColumn();
     } catch (Throwable $e) {}
     try {
         $v += (float)$db->query(
             "SELECT COALESCE(SUM(GREATEST(0,COALESCE(mvs.stock,0))*COALESCE(mv.purchase_price,0)),0)
              FROM marketplace_product_variant_stocks mvs
-             JOIN marketplace_product_variants mv ON mv.id=mvs.variant_id AND mv.is_active=1
-             JOIN products p ON p.id=mv.product_id AND COALESCE(p.purchase_price,0)<=0
-             WHERE mvs.stock>0"
+             INNER JOIN marketplace_product_variants mv ON mv.id=mvs.variant_id AND mv.is_active=1
+             INNER JOIN products p ON p.id=mv.product_id AND p.purchase_price <= 0
+             WHERE mvs.stock > 0"
         )->fetchColumn();
     } catch (Throwable $e) {}
     return $v;
