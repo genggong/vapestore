@@ -18,26 +18,53 @@
 declare(strict_types=1);
 
 // Fallback bootstrap: jalankan dari tools/ (cd repo && php tools/backfill_v17_0_16.php)
-// Pola sama dengan backfill_pos_transactions.php yang sudah teruji di hosting.
+// Pola sama dengan backfill lama yang sudah teruji di hosting (docroot/app):
+// hosting memuat app/bootstrap.php LANGSUNG (bukan legacy/app) + app/Modules.
 $candidates = [
+    __DIR__ . '/../app/bootstrap.php',
     __DIR__ . '/../legacy/app/bootstrap.php',
-    __DIR__ . '/legacy/app/bootstrap.php',
-    getcwd() . '/legacy/app/bootstrap.php',
+    getcwd() . '/../app/bootstrap.php',
     getcwd() . '/../legacy/app/bootstrap.php',
+    getcwd() . '/app/bootstrap.php',
+    __DIR__ . '/app/bootstrap.php',
 ];
 $loaded = false;
 foreach ($candidates as $bootstrap) {
     if (is_file($bootstrap)) {
-        require $bootstrap;
+        require_once $bootstrap;
         $loaded = true;
         break;
     }
 }
 if (!$loaded) {
-    fwrite(STDERR, "Tidak dapat memuat bootstrap aplikasi.\n");
+    fwrite(STDERR, "Tidak dapat memuat bootstrap aplikasi. Jalankan dari docroot: cd ~/public_html && php tools/backfill_v17_0_16.php\n");
     exit(1);
 }
-require_once __DIR__ . '/../legacy/public/admin/purchases/_helpers.php';
+
+// Pastikan avg_hpp() tersedia — coba muat dari tree mana pun yang ada di hosting,
+// dan punya fallback inline agar backfill tetap jalan walau path helper berubah.
+if (!function_exists('avg_hpp')) {
+    foreach ([
+        __DIR__ . '/../public/admin/purchases/_helpers.php',
+        __DIR__ . '/../legacy/public/admin/purchases/_helpers.php',
+        getcwd() . '/public/admin/purchases/_helpers.php',
+        getcwd() . '/legacy/public/admin/purchases/_helpers.php',
+    ] as $h) {
+        if (is_file($h)) {
+            require_once $h;
+            break;
+        }
+    }
+}
+if (!function_exists('avg_hpp')) {
+    function avg_hpp(float $oldStock, float $oldPrice, float $newQty, float $newPrice): float
+    {
+        if ($newQty <= 0) return $oldPrice;
+        $total = $oldStock + $newQty;
+        if ($oldStock <= 0 || $oldPrice <= 0) return $newPrice;
+        return round(($oldStock * $oldPrice + $newQty * $newPrice) / $total, 2);
+    }
+}
 
 $db = Database::connect();
 
