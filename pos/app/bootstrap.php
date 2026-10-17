@@ -10,6 +10,33 @@ require_once __DIR__ . '/Core/CSRF.php';
 require_once __DIR__ . '/Core/Auth.php';
 require_once __DIR__ . '/Helpers/helpers.php';
 
+// V17.0.18: versi aset WAJIB selalu terdefinisi. Kalau helpers.php versi lama (belum
+// me-require asset_helpers.php) atau file helper-nya hilang, layout admin fatal dengan
+// "Undefined constant APP_ASSET_VERSION" -> seluruh halaman admin 500. Definisi di sini
+// tidak bergantung pada helpers.php sehingga halaman tetap jalan.
+if (!function_exists('vk_asset_version')) {
+    function vk_asset_version(): string
+    {
+        static $v = null;
+        if ($v !== null) return $v;
+        $v = '';
+        foreach ([
+            dirname(__DIR__, 2) . '/VERSION',   // docroot
+            dirname(__DIR__) . '/VERSION',      // folder tree
+            __DIR__ . '/../../VERSION',
+        ] as $candidate) {
+            if (is_file($candidate)) {
+                $v = trim((string) @file_get_contents($candidate));
+                if ($v !== '') break;
+            }
+        }
+        return $v !== '' ? $v : '1';
+    }
+}
+if (!defined('APP_ASSET_VERSION')) {
+    define('APP_ASSET_VERSION', vk_asset_version());
+}
+
 date_default_timezone_set(app_config('timezone', 'Asia/Jakarta'));
 
 if (app_config('debug', false)) {

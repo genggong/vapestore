@@ -4,6 +4,7 @@ Menguji STRUKTUR sumber (bukan runtime). Jalankan:
     python3 -m unittest tests.test_patch_v17_0_17 -v
 """
 import pathlib
+import re
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -103,8 +104,14 @@ class TestPosIndexGuardInputMember(unittest.TestCase):
 
 
 class TestVersi(unittest.TestCase):
+    """v17.0.17 tetap terpasang minimal setelah rilis berikutnya."""
+
+    @staticmethod
+    def _ver(text):
+        return tuple(int(x) for x in re.findall(r'\d+', text)[:3])
+
     def test_version_file(self):
-        self.assertEqual(read(ROOT / 'VERSION').strip(), '17.0.17')
+        self.assertGreaterEqual(self._ver(read(ROOT / 'VERSION').strip()), (17, 0, 17))
 
     def test_system_upgrade_3_tree(self):
         for rel in ('app/Modules/System/SystemUpgrade.php',
@@ -112,7 +119,7 @@ class TestVersi(unittest.TestCase):
                     'pos/app/Modules/System/SystemUpgrade.php'):
             with self.subTest(file=rel):
                 src = read(ROOT / rel)
-                self.assertIn('v17.0.17', src, f'{rel}: versi belum di-bump')
+                self.assertGreaterEqual(self._ver(src), (17, 0, 17), f'{rel}: versi turun')
 
 
 if __name__ == '__main__':
