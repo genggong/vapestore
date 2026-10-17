@@ -59,7 +59,14 @@ try {
         if ((string)$order['courier_code']==='store') throw new RuntimeException('Pesanan Kurir Toko selesai otomatis setelah kurir mengunggah bukti penerimaan.');
         if ((string)$order['courier_code']==='pickup') throw new RuntimeException('Gunakan panel Ambil di Toko dan verifikasi kode pengambilan.');
         if ($order['order_status'] !== 'shipped') throw new RuntimeException('Pesanan belum berstatus dikirim.');
-        $db->prepare("UPDATE online_orders SET order_status='completed',fulfillment_status='completed',completed_at=COALESCE(completed_at,NOW()),updated_at=NOW() WHERE id=?")->execute([$id]);
+        $db->prepare("UPDATE online_orders SET order_status='completed',fulfillment_status='completed',completed_at=COALESCE(completed_at,NOW()),updated_at=NOW() WHERE id=?")
+
+->execute([$id]);
+        // V17.0.13: catat penjualan online ke transaksi POS (bugfix: hilang dari laporan)
+        if (function_exists('marketplace_record_pos_transaction')) {
+            try { marketplace_record_pos_transaction($db, $id); }
+            catch (Throwable $e) { error_log('[VAPEKONG][pos_record] admin completed order '.$id.' gagal: '.$e->getMessage()); }
+        }
         marketplace_add_event($db,$id,'completed','Pesanan selesai','Pesanan telah diselesaikan.');
         Auth::log('marketplace_order_completed','Marketplace '.$order['order_number']);
         flash('success','Pesanan selesai.');

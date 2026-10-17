@@ -15,20 +15,23 @@ require_once __DIR__ . '/StorePickup.php';
 
 function marketplace_table_exists(PDO $db, string $table): bool
 {
-    // V15.11: do not use a bound placeholder inside SHOW TABLES LIKE.
-    // Several shared-hosting MySQL/MariaDB configurations reject that syntax,
-    // which made the Database Doctor report every table as missing.
+    // Cache INFORMATION_SCHEMA checks for the lifetime of one request. Several
+    // pages call this helper dozens/hundreds of times while rendering catalogs.
+    static $cache = [];
+    $key = spl_object_id($db) . ':' . $table;
+    if (!empty($cache[$key])) return true;
+
     try {
         $stmt = $db->prepare("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1");
         $stmt->execute([$table]);
-        if ((bool)$stmt->fetchColumn()) return true;
+        if ((bool)$stmt->fetchColumn()) return $cache[$key] = true;
     } catch (Throwable $e) {
         // Continue to a direct, read-only fallback below.
     }
     try {
         if (!preg_match('/^[A-Za-z0-9_]+$/', $table)) return false;
         $db->query("SELECT 1 FROM `{$table}` LIMIT 1");
-        return true;
+        return $cache[$key] = true;
     } catch (Throwable $e) {
         return false;
     }
@@ -36,17 +39,21 @@ function marketplace_table_exists(PDO $db, string $table): bool
 
 function marketplace_column_exists(PDO $db, string $table, string $column): bool
 {
+    static $cache = [];
+    $key = spl_object_id($db) . ':' . $table . ':' . $column;
+    if (!empty($cache[$key])) return true;
+
     try {
         $stmt = $db->prepare("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1");
         $stmt->execute([$table, $column]);
-        if ((bool)$stmt->fetchColumn()) return true;
+        if ((bool)$stmt->fetchColumn()) return $cache[$key] = true;
     } catch (Throwable $e) {
         // Fallback below.
     }
     try {
         if (!preg_match('/^[A-Za-z0-9_]+$/', $table) || !preg_match('/^[A-Za-z0-9_]+$/', $column)) return false;
         $db->query("SELECT `{$column}` FROM `{$table}` LIMIT 0");
-        return true;
+        return $cache[$key] = true;
     } catch (Throwable $e) {
         return false;
     }
@@ -338,6 +345,15 @@ function marketplace_install(PDO $db): void
         if (!marketplace_column_exists($db, 'online_orders', 'voucher_released_at')) $db->exec("ALTER TABLE online_orders ADD COLUMN voucher_released_at DATETIME NULL");
         if (!marketplace_column_exists($db, 'online_orders', 'points_earned')) $db->exec("ALTER TABLE online_orders ADD COLUMN points_earned INT NOT NULL DEFAULT 0");
         if (!marketplace_column_exists($db, 'online_orders', 'points_awarded_at')) $db->exec("ALTER TABLE online_orders ADD COLUMN points_awarded_at DATETIME NULL");
+        // V17.0.11: penanda order online sudah dicatat ke transaksi POS (idempotent)
+        if (!marketplace_column_exists($db, 'online_orders', 'pos_recorded_at')) $db->exec("ALTER TABLE online_orders ADD COLUMN pos_recorded_at DATETIME NULL");
+        if (!marketplace_column_exists($db, 'online_orders', 'pos_invoice_number')) $db->exec("ALTER TABLE online_orders ADD COLUMN pos_invoice_number VARCHAR(80) NULL");
+        // V17.0.11: penanda relasi transaksi POS ke order online + ongkir (dipisah di akuntansi)
+        if (marketplace_table_exists($db, 'transactions')) {
+            if (!marketplace_column_exists($db, 'transactions', 'reference_type')) $db->exec("ALTER TABLE transactions ADD COLUMN reference_type VARCHAR(40) NULL");
+            if (!marketplace_column_exists($db, 'transactions', 'reference_id')) $db->exec("ALTER TABLE transactions ADD COLUMN reference_id BIGINT NULL");
+            if (!marketplace_column_exists($db, 'transactions', 'shipping_cost')) $db->exec("ALTER TABLE transactions ADD COLUMN shipping_cost DECIMAL(15,2) NOT NULL DEFAULT 0");
+        }
     } catch (Throwable $ignore) {}
 
     try { $db->exec("CREATE TABLE IF NOT EXISTS customer_addresses (
@@ -470,16 +486,20 @@ function marketplace_rajaongkir_config(): array
 
 function marketplace_pakasir_config(PDO $db = null): array
 {
-    // V12 keeps Marketplace and POS gateway credentials strictly separated.
+    // Marketplace dan POS memakai project/credential Pakasir terpisah.
+    // v17.0.9: webhook v2 menggunakan X-Secret dari halaman detail project Pakasir.
     $project = trim((string) setting('marketplace_pakasir_project', ''));
     $apiKey = trim((string) setting('marketplace_pakasir_api_key', ''));
-    $token = trim((string) setting('pakasir_webhook_token', ''));
-    if ($db && $token === '') $token = marketplace_ensure_secret($db, 'pakasir_webhook_token');
+    $webhookSecret = trim((string) setting('marketplace_pakasir_webhook_secret', ''));
+    $legacyToken = trim((string) setting('pakasir_webhook_token', ''));
+    if ($db && $legacyToken === '') $legacyToken = marketplace_ensure_secret($db, 'pakasir_webhook_token');
     return [
         'project' => $project,
         'api_key' => $apiKey,
-        'webhook_token' => $token,
+        'webhook_secret' => $webhookSecret,
+        'webhook_token' => $legacyToken, // fallback URL lama selama transisi.
         'base_url' => 'https://app.pakasir.com',
+        'api_version' => 'v2',
     ];
 }
 
@@ -781,16 +801,18 @@ function marketplace_find_shipping_option(array $options, string $code, string $
 
 function marketplace_pakasir_methods(): array
 {
+    // Daftar metode resmi Pakasir API v2 (13 Okt 2026).
     return [
         'qris' => 'QRIS',
         'bri_va' => 'BRI Virtual Account',
         'bni_va' => 'BNI Virtual Account',
         'cimb_niaga_va' => 'CIMB Niaga Virtual Account',
-        'permata_va' => 'Permata Virtual Account',
+        'danamon_va' => 'Danamon Virtual Account',
         'maybank_va' => 'Maybank Virtual Account',
         'bnc_va' => 'Bank Neo Commerce Virtual Account',
-        'artha_graha_va' => 'Artha Graha Virtual Account',
-        'sampoerna_va' => 'Sahabat Sampoerna Virtual Account',
+        'bsi_va' => 'BSI Virtual Account',
+        'muamalat_va' => 'Bank Muamalat Virtual Account',
+        'ocbc_va' => 'OCBC Virtual Account',
     ];
 }
 
@@ -803,6 +825,12 @@ function marketplace_pakasir_create(PDO $db, string $orderId, int $amount, strin
         throw new RuntimeException('Slug Project / API Key pembayaran belum diatur.');
     }
     if ($amount <= 0) throw new InvalidArgumentException('Nominal pembayaran tidak valid.');
+    if ($method === 'qris' && ($amount < 500 || $amount > 10000000)) {
+        throw new InvalidArgumentException('Nominal QRIS Pakasir v2 harus Rp500 s.d. Rp10.000.000.');
+    }
+    if ($method !== 'qris' && ($amount < 10000 || $amount > 50000000)) {
+        throw new InvalidArgumentException('Nominal Virtual Account Pakasir v2 harus Rp10.000 s.d. Rp50.000.000.');
+    }
 
     $url = $config['base_url'] . '/api/v2/create-transaction/' . rawurlencode($config['project']) . '/' . rawurlencode($orderId);
     $json = marketplace_http_json($url, 'POST', [
@@ -1248,13 +1276,32 @@ function marketplace_create_order(PDO $db, array $payload): array
             $postalCode ?: null,$customerNote ?: null,(int) $cart['weight_gram'],$subtotal,$discount,$voucherLocked['code'] ?: null,$shippingCost,$shippingDiscount,(int)$pointsLocked['points'],$pointsDiscount,(int)$pointsLocked['points'],$grandTotal,
             $selected['code'],$selected['name'],$selected['service'],$selected['description'],$selected['etd'],$paymentMethod,$grandAmount
         ]);
+
+        // WAJIB ambil id parent langsung sesudah INSERT online_orders. Pada PDO/MySQL,
+        // query UPDATE/INSERT lain setelah ini dapat mengubah hasil lastInsertId() pada
+        // sebagian driver/shared-hosting dan membuat online_order_items memakai order_id=0.
+        $orderId = (int) $db->lastInsertId();
+        if ($orderId <= 0) {
+            $orderLookup = $db->prepare("SELECT id FROM online_orders WHERE order_number=? LIMIT 1 FOR UPDATE");
+            $orderLookup->execute([$orderNumber]);
+            $orderId = (int) $orderLookup->fetchColumn();
+        }
+        if ($orderId <= 0) {
+            throw new RuntimeException('ID pesanan tidak terbentuk setelah menyimpan order. Jalankan Upgrade Sistem & Database lalu coba checkout kembali.');
+        }
+
         if ($voucherLocked['code'] !== '') {
             $db->prepare("UPDATE marketplace_vouchers SET used_count=used_count+1,updated_at=NOW() WHERE id=?")->execute([(int)$voucherLocked['voucher']['id']]);
         }
-        $orderId = (int) $db->lastInsertId();
         if ($requestedCourier === 'pickup') {
             $pickupCode = marketplace_store_pickup_generate_code();
             $db->prepare("UPDATE online_orders SET pickup_code=?,delivery_status='Menunggu diproses untuk pengambilan di toko' WHERE id=?")->execute([$pickupCode,$orderId]);
+        }
+
+        $parentCheck = $db->prepare("SELECT id FROM online_orders WHERE id=? AND order_number=? LIMIT 1");
+        $parentCheck->execute([$orderId,$orderNumber]);
+        if (!(int)$parentCheck->fetchColumn()) {
+            throw new RuntimeException('Parent pesanan tidak ditemukan sebelum menyimpan item checkout. Transaksi dibatalkan aman; jalankan Upgrade Sistem & Database.');
         }
 
         $itemStmt = $db->prepare("INSERT INTO online_order_items (order_id,product_id,variant_id,product_code,product_name,variant_name,variant_sku,flash_sale_item_id,unit,qty,unit_price,purchase_price,weight_gram,line_total,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())");
@@ -1339,6 +1386,137 @@ function marketplace_award_customer_points(PDO $db, int $orderId): int
     } catch(Throwable $e){ if($started&&$db->inTransaction())$db->rollBack(); return 0; }
 }
 
+/**
+ * V17.0.11 — CATAT ORDER ONLINE YANG SUDAH COMPLETED KE TRANSAKSI POS.
+ *
+ * Bug (v17.0.10): order online yang sudah dibayar & selesai TIDAK pernah dicatat
+ * ke tabel `transactions`, sehingga penjualan online HILANG dari laporan
+ * akuntansi/penjualan (stok tetap terpotong & poin member tetap diberikan,
+ * tetapi laporan keuangan tidak mencatat pendapatan).
+ *
+ * Fungsi ini idempotent (dijaga kolom online_orders.pos_recorded_at): dipanggil
+ * saat order menjadi `completed` dari 3 titik: admin Tandai Selesai,
+ * kurir toko delivered, dan ambil di toko.
+ *
+ * Ongkir (shipping_cost) dicatat terpisah di kolom transactions.shipping_cost
+ * agar laporan akuntansi dapat memisahkannya dari gross profit barang.
+ */
+function marketplace_record_pos_transaction(PDO $db, int $orderId): ?int
+{
+    $started = !$db->inTransaction();
+    if ($started) $db->beginTransaction();
+    try {
+        $stmt = $db->prepare("SELECT * FROM online_orders WHERE id=? LIMIT 1 FOR UPDATE");
+        $stmt->execute([$orderId]);
+        $order = $stmt->fetch();
+        if (!$order) { if ($started && $db->inTransaction()) $db->rollBack(); return null; }
+
+        // Idempotent: sudah dicatat sebelumnya -> jangan duplikat.
+        if (!empty($order['pos_recorded_at'])) { if ($started && $db->inTransaction()) $db->rollBack(); return null; }
+        // Hanya order yang benar-benar lunas & selesai.
+        if ((string)($order['payment_status'] ?? '') !== 'paid' || (string)($order['order_status'] ?? '') !== 'completed') {
+            if ($started && $db->inTransaction()) $db->rollBack();
+            return null;
+        }
+
+        // Barang order.
+        $items = marketplace_order_items($db, $orderId);
+        if (!$items) { if ($started && $db->inTransaction()) $db->rollBack(); return null; }
+
+        $branchId    = (int)($order['branch_id'] ?? 0);
+        $customerId  = (int)($order['customer_id'] ?? 0);
+        $subtotal    = (float)($order['subtotal'] ?? 0);
+        $discount    = (float)($order['discount'] ?? 0);
+        $ongkir      = (float)($order['shipping_cost'] ?? 0);
+        $grandTotal  = (float)($order['grand_total'] ?? 0);
+        $paidAmount  = (float)($order['payment_amount'] ?? 0);
+        if ($paidAmount <= 0) $paidAmount = $grandTotal;
+
+        // Nomor invoice POS mengikuti format yang sama dengan kasir.
+        $invoice = marketplace_pos_invoice_number($db);
+
+        $stmt = $db->prepare("INSERT INTO transactions
+            (invoice_number, cashier_id, customer_id, branch_id, subtotal, discount, tax, grand_total, paid_amount, change_amount, debt_amount, debt_status, payment_method, status, note, transaction_date, created_at, reference_type, reference_id, shipping_cost)
+            VALUES (?, NULL, ?, ?, ?, ?, 0, ?, ?, 0, 0, NULL, ?, 'success', ?, ?, NOW(), 'online_order', ?, ?)");
+        $stmt->execute([
+            $invoice,
+            $customerId > 0 ? $customerId : null,
+            $branchId > 0 ? $branchId : null,
+            $subtotal,
+            $discount,
+            $grandTotal,
+            $paidAmount,
+            $order['payment_method'] ?? 'online',
+            'Penjualan online ' . ($order['order_number'] ?? ''),
+            $order['created_at'] ?? null,
+            $orderId,
+            $ongkir,
+        ]);
+        $transactionId = (int)$db->lastInsertId();
+
+        foreach ($items as $item) {
+            $qty       = max(1, (int)($item['qty'] ?? 1));
+            $unitPrice = (float)($item['unit_price'] ?? 0);
+            $purchase  = (float)($item['purchase_price'] ?? 0);
+            $name      = (string)($item['product_name'] ?? '-');
+            $variantName = !empty($item['variant_name']) ? (string)$item['variant_name'] : null;
+            $variantSku  = !empty($item['variant_sku']) ? (string)$item['variant_sku'] : null;
+            $productId   = (int)($item['product_id'] ?? 0);
+            $variantId   = !empty($item['variant_id']) ? (int)$item['variant_id'] : null;
+
+            $stmt = $db->prepare("INSERT INTO transaction_items
+                (transaction_id, item_type, product_id, variant_id, product_name, variant_name, variant_sku, qty, unit_price, purchase_price, discount, subtotal, created_at)
+                VALUES (?, 'product', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NOW())");
+            $stmt->execute([
+                $transactionId,
+                $productId > 0 ? $productId : null,
+                $variantId,
+                $name,
+                $variantName,
+                $variantSku,
+                $qty,
+                $unitPrice,
+                $purchase,
+                round($unitPrice * $qty, 2),
+            ]);
+        }
+
+        // Poin member: kalau poin marketplace sudah diberikan dengan transaction_id NULL
+        // (alur lama), kaitkan baris poin itu ke transaksi POS sekarang.
+        if ($customerId > 0 && marketplace_table_exists($db, 'customer_points')) {
+            $db->prepare("UPDATE customer_points SET transaction_id=? WHERE customer_id=? AND transaction_id IS NULL AND description LIKE ?")
+                ->execute([$transactionId, $customerId, 'Poin belanja marketplace ' . $order['order_number']]);
+        }
+
+        // Tandai sudah dicatat (idempotent) + simpan nomor invoice utk penelusuran.
+        $db->prepare("UPDATE online_orders SET pos_recorded_at=NOW(), pos_invoice_number=?, updated_at=NOW() WHERE id=?")
+            ->execute([$invoice, $orderId]);
+        if ($started) $db->commit();
+
+        try { marketplace_add_event($db, $orderId, 'pos_recorded', 'Tercatat ke laporan POS', 'Penjualan online dicatat sebagai invoice ' . $invoice . ' (ongkir ' . rupiah($ongkir) . ')'); } catch (Throwable $ignore) {}
+        try { marketplace_v15_log($db, 'online_order.pos_recorded', 'online_order', $orderId, 'Invoice POS ' . $invoice); } catch (Throwable $ignore) {}
+        return $transactionId;
+    } catch (Throwable $e) {
+        if ($started && $db->inTransaction()) $db->rollBack();
+        error_log('[VAPEKONG][pos_record] order ' . $orderId . ' gagal: ' . $e->getMessage());
+        return null;
+    }
+}
+
+function marketplace_pos_invoice_number(PDO $db): string
+{
+    $prefix = 'INV-' . date('Ymd') . '-';
+    $stmt = $db->prepare("SELECT invoice_number FROM transactions WHERE invoice_number LIKE ? ORDER BY id DESC LIMIT 1");
+    $stmt->execute([$prefix . '%']);
+    $last = $stmt->fetchColumn();
+    $next = 1;
+    if ($last) {
+        $parts = explode('-', $last);
+        $next = ((int) end($parts)) + 1;
+    }
+    return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+}
+
 function marketplace_payment_status_normalize(?string $status): string
 {
     $status = strtolower(trim((string) $status));
@@ -1366,6 +1544,12 @@ function marketplace_apply_payment_webhook(PDO $db, array $payload): ?array
     $expected = (int) round((float) ($order['payment_amount'] ?: $order['grand_total']));
     if ($amount <= 0 || $amount !== $expected) throw new RuntimeException('Amount webhook tidak sesuai.');
 
+    $incomingTxnId = trim((string)($payload['txn_id'] ?? $payload['data']['txn_id'] ?? ''));
+    $expectedTxnId = trim((string)($order['payment_txn_id'] ?? ''));
+    if ($expectedTxnId !== '' && $incomingTxnId !== '' && !hash_equals($expectedTxnId, $incomingTxnId)) {
+        throw new RuntimeException('txn_id webhook Pakasir tidak sesuai.');
+    }
+
     $rawStatus = (string) ($payload['status'] ?? $payload['data']['status'] ?? 'pending');
     $status = marketplace_payment_status_normalize($rawStatus);
     if ($status === 'paid') {
@@ -1382,6 +1566,42 @@ function marketplace_apply_payment_webhook(PDO $db, array $payload): ?array
         marketplace_add_event($db, (int) $order['id'], $status, 'Pembayaran ' . ($status === 'expired' ? 'kedaluwarsa' : 'gagal'), 'Stok otomatis dikembalikan.');
     }
     return marketplace_get_order($db, $orderNumber);
+}
+
+
+function marketplace_pakasir_sync_status(PDO $db, array $order): array
+{
+    $txnId = trim((string)($order['payment_txn_id'] ?? ''));
+    if ($txnId === '') return $order;
+    if (in_array((string)($order['payment_status'] ?? ''), ['paid','expired','failed','cancelled'], true)) return $order;
+
+    $config = marketplace_pakasir_config($db);
+    if ($config['project'] === '' || $config['api_key'] === '') return $order;
+
+    $url = $config['base_url'] . '/api/v2/transaction-status/'
+        . rawurlencode($config['project']) . '/' . rawurlencode($txnId);
+    $json = marketplace_http_json($url, 'GET', [
+        'Accept: application/json',
+        'X-Api-Key: ' . $config['api_key'],
+    ]);
+
+    if (!empty($json['order_id']) && !hash_equals((string)$order['order_number'], (string)$json['order_id'])) {
+        throw new RuntimeException('Order ID status Pakasir v2 tidak sesuai.');
+    }
+    $expected = (int)round((float)($order['payment_amount'] ?: $order['grand_total']));
+    if (isset($json['amount']) && (int)$json['amount'] !== $expected) {
+        throw new RuntimeException('Nominal status Pakasir v2 tidak sesuai.');
+    }
+
+    $payload = [
+        'txn_id' => (string)($json['txn_id'] ?? $txnId),
+        'order_id' => (string)($json['order_id'] ?? $order['order_number']),
+        'amount' => (int)($json['amount'] ?? $expected),
+        'status' => (string)($json['status'] ?? 'pending'),
+        'completed_at' => (string)($json['completed_at'] ?? ''),
+    ];
+    $updated = marketplace_apply_payment_webhook($db, $payload);
+    return $updated ?: $order;
 }
 
 function marketplace_order_status_label(string $status): string

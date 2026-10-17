@@ -201,6 +201,11 @@ function marketplace_store_pickup_complete(PDO $db, int $orderId, string $pickup
         if ($recipient === '') throw new RuntimeException('Nama penerima barang wajib diisi.');
         $db->prepare("UPDATE online_orders SET order_status='completed',fulfillment_status='completed',pickup_recipient=?,pickup_note=?,picked_up_at=COALESCE(picked_up_at,NOW()),completed_at=COALESCE(completed_at,NOW()),delivery_status='Sudah diambil di toko',updated_at=NOW() WHERE id=?")
             ->execute([$recipient,$note !== '' ? $note : null,$orderId]);
+        // V17.0.11: catat penjualan online ke transaksi POS (bugfix hilang dari laporan)
+        if (function_exists('marketplace_record_pos_transaction')) {
+            try { marketplace_record_pos_transaction($db,$orderId); }
+            catch (Throwable $e) { error_log('[VAPEKONG][pos_record] store_pickup order '.$orderId.' gagal: '.$e->getMessage()); }
+        }
         $db->commit();
     } catch (Throwable $e) {
         if ($db->inTransaction()) $db->rollBack();

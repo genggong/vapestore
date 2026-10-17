@@ -1,6 +1,6 @@
 <?php
 /**
- * Marketplace Store Courier portal (V15.4)
+ * Marketplace Store Courier portal (v17.0.10)
  * - Dedicated courier accounts/session (separate from admin/customer auth)
  * - Local/store-courier shipping option
  * - Admin assignment + courier delivery workflow
@@ -329,16 +329,12 @@ function marketplace_courier_events(PDO $db,int $assignmentId): array
 function marketplace_courier_upload_proof(array $file,int $orderId): ?string
 {
     if(empty($file['name'])||empty($file['tmp_name'])) return null;
-    if(($file['error']??UPLOAD_ERR_OK)!==UPLOAD_ERR_OK) throw new RuntimeException('Upload bukti pengantaran gagal.');
-    if((int)($file['size']??0)>6*1024*1024) throw new RuntimeException('Ukuran foto bukti maksimal 6MB.');
-    $info=@getimagesize($file['tmp_name']);$map=[IMAGETYPE_JPEG=>'jpg',IMAGETYPE_PNG=>'png',IMAGETYPE_WEBP=>'webp'];
-    $ext=$info&&isset($map[$info[2]??0])?$map[$info[2]]:null;
-    if(!$ext) throw new RuntimeException('Bukti pengantaran harus berupa JPG, PNG, atau WEBP.');
-    $dir=dirname(__DIR__,3).'/public/uploads/courier-proof';
-    if(!is_dir($dir)&&!mkdir($dir,0775,true)&&!is_dir($dir)) throw new RuntimeException('Folder bukti pengantaran tidak dapat dibuat.');
-    $name='proof-'.$orderId.'-'.date('YmdHis').'-'.bin2hex(random_bytes(3)).'.'.$ext;
-    if(!move_uploaded_file($file['tmp_name'],$dir.'/'.$name)) throw new RuntimeException('Gagal menyimpan foto bukti.');
-    return 'uploads/courier-proof/'.$name;
+    try {
+        // v17.0.10: simpan bukti ke /uploads canonical dan kompres otomatis agar backup hosting tidak cepat membesar.
+        return legacy_store_optimized_image($file,'uploads/courier-proof','proof-'.$orderId,6*1024*1024,1600,1600,76);
+    } catch (Throwable $e) {
+        throw new RuntimeException('Foto bukti gagal disimpan: '.$e->getMessage(),0,$e);
+    }
 }
 
 function marketplace_courier_update_location(PDO $db,int $assignmentId,int $courierId,?float $lat,?float $lng): void
@@ -395,6 +391,11 @@ function marketplace_courier_update_status(PDO $db,int $assignmentId,int $courie
         $db->prepare("UPDATE online_orders SET order_status='shipped',fulfillment_status='shipped',delivery_status=?,shipped_at=COALESCE(shipped_at,NOW()),updated_at=NOW() WHERE id=?")->execute([$deliveryStatus,$orderId]);
     } elseif($tr['to']==='delivered'){
         $db->prepare("UPDATE online_orders SET order_status='completed',fulfillment_status='completed',delivery_status=?,completed_at=COALESCE(completed_at,NOW()),updated_at=NOW() WHERE id=?")->execute([$deliveryStatus,$orderId]);
+        // V17.0.13: catat penjualan online ke transaksi POS (bugfix hilang dari laporan)
+        if (function_exists('marketplace_record_pos_transaction')) {
+            try { marketplace_record_pos_transaction($db,$orderId); }
+            catch (Throwable $e) { error_log('[VAPEKONG][pos_record] courier deliver order '.$orderId.' gagal: '.$e->getMessage()); }
+        }
     } elseif($tr['to']==='returned') {
         $db->prepare("UPDATE online_orders SET order_status='processing',fulfillment_status='ready_ship',delivery_status=?,shipped_at=NULL,updated_at=NOW() WHERE id=?")->execute([$deliveryStatus,$orderId]);
     } else {
