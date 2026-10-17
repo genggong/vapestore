@@ -35,8 +35,8 @@ $storeFavicon = storefront_visual_url($store['marketplace_favicon'] ?? '', 'favi
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="<?= legacy_base_url('assets/css/storefront.css?v=15.14.0'); ?>" rel="stylesheet">
-    <link href="<?= legacy_base_url('assets/css/marketplace-theme.css?v=15.8.0'); ?>" rel="stylesheet">
+    <link href="<?= legacy_base_url('assets/css/storefront.css?v=17.0.20'); ?>" rel="stylesheet">
+    <link href="<?= legacy_base_url('assets/css/marketplace-theme.css?v=17.0.20'); ?>" rel="stylesheet">
     <style>
       .store-brand-text-fallback{display:none;font-weight:900;font-size:20px;letter-spacing:-.5px;color:#151827;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .store-brand.logo-broken .store-brand-text-fallback{display:block}
