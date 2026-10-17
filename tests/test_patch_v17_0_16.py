@@ -116,13 +116,20 @@ class TestCrossTreeKonvensiUrl(unittest.TestCase):
 
 
 class TestVersi(unittest.TestCase):
+    """Versi 17.0.16 tetap terpasang minimal setelah rilis berikutnya (17.0.17 dst)."""
+
+    @staticmethod
+    def _ver(text):
+        return tuple(int(x) for x in re.findall(r'\d+', text)[:3])
+
     def test_version_file(self):
         v = read('VERSION').strip()
-        self.assertEqual(v, '17.0.16')
+        self.assertGreaterEqual(self._ver(v), (17, 0, 16), f'VERSION turun ke {v}')
 
     def test_system_upgrade_visible(self):
         src = read('legacy/public/admin/system-upgrade/index.php')
-        self.assertIn('v17.0.16', src)
+        version = read('VERSION').strip()
+        self.assertIn(f'v{version}', src, 'versi terlihat di halaman system-upgrade belum ikut VERSION')
         # Catatan historis lama tidak boleh ikut di-rewrite
         self.assertIn('v17.0.12 mempertahankan perbaikan pengambilan ID order', src)
 

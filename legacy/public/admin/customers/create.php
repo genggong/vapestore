@@ -43,6 +43,8 @@ if (is_post()) {
     $creditLimit = (float)($_POST['credit_limit'] ?? 0);
     $note = trim($_POST['note'] ?? '');
     $status = $_POST['status'] ?? 'active';
+    // V17.0.17: password marketplace (opsional) — member baru dari POS langsung bisa login marketplace
+    $newPassword = (string)($_POST['marketplace_password'] ?? '');
 
     if ($name === '') {
         flash('error', 'Nama pelanggan wajib diisi.');
@@ -51,9 +53,25 @@ if (is_post()) {
 
     try {
 
-        $stmt = $db->prepare("INSERT INTO customers (name, phone, email, address, member_code, member_level, price_level, points, credit_limit, note, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $phone ?: null, $email ?: null, $address ?: null, $memberCode ?: null, $memberLevel, $priceLevel, $points, $creditLimit, $note ?: null, $status]);
-        Auth::log('create_customer', 'Tambah pelanggan ' . $name);
+        if ($newPassword !== '') {
+            if (strlen($newPassword) < 6) {
+                throw new InvalidArgumentException('Password minimal 6 karakter.');
+            }
+            // V17.0.17: pastikan kolom marketplace ada di instalasi lama (idempotent, tanpa DROP)
+            foreach (['marketplace_password_hash' => 'VARCHAR(255) NULL', 'marketplace_registered_at' => 'DATETIME NULL'] as $col => $def) {
+                $chk = $db->query("SHOW COLUMNS FROM customers LIKE " . $db->quote($col));
+                if (!$chk->fetch()) {
+                    $db->exec("ALTER TABLE customers ADD COLUMN {$col} {$def}");
+                }
+            }
+            $stmt = $db->prepare("INSERT INTO customers (name, phone, email, address, member_code, member_level, price_level, points, credit_limit, note, status, marketplace_password_hash, marketplace_registered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->execute([$name, $phone ?: null, $email ?: null, $address ?: null, $memberCode ?: null, $memberLevel, $priceLevel, $points, $creditLimit, $note ?: null, $status, password_hash($newPassword, PASSWORD_DEFAULT)]);
+            Auth::log('create_customer', 'Tambah pelanggan ' . $name . ' (password marketplace di-set)');
+        } else {
+            $stmt = $db->prepare("INSERT INTO customers (name, phone, email, address, member_code, member_level, price_level, points, credit_limit, note, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $phone ?: null, $email ?: null, $address ?: null, $memberCode ?: null, $memberLevel, $priceLevel, $points, $creditLimit, $note ?: null, $status]);
+            Auth::log('create_customer', 'Tambah pelanggan ' . $name);
+        }
         flash('success', 'Pelanggan berhasil ditambahkan.');
 
         legacy_redirect('admin/customers/index.php');
@@ -112,6 +130,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
             </div>
             <div class="customer-field full"><label>Alamat</label><textarea name="address"><?= e($customer['address']); ?></textarea></div>
             <div class="customer-field full"><label>Catatan</label><textarea name="note"><?= e($customer['note']); ?></textarea></div>
+            <div class="customer-field full"><label>Password Marketplace (opsional)</label><input type="password" name="marketplace_password" placeholder="Kosongkan jika belum ingin dibuatkan login" autocomplete="new-password"><small style="color:#8b93a1">Untuk login pelanggan di marketplace pakai No HP + password ini. Minimal 6 karakter. Kalau dikosongkan, bisa diisi nanti dari halaman Edit Pelanggan.</small></div>
         </div>
 
         <div class="customer-form-actions">

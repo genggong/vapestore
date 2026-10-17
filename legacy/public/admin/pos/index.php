@@ -1019,11 +1019,22 @@ foreach ($bundleRows as $bundleRow) {
 }
 
 
+// V17.0.17: daftar member TIDAK boleh gagal senyap — kasir harus tahu kalau input member tidak jalan.
+// Kalau kolom baru (price_level) belum ada, pakai fallback query supaya POS tetap bisa dipakai.
 $customers = [];
+$customerLoadError = '';
 try {
     $customers = $db->query("SELECT id, name, phone, member_code, member_level, price_level, points FROM customers WHERE status = 'active' ORDER BY name ASC")->fetchAll();
 } catch (Throwable $e) {
-    $customers = [];
+    error_log('[POS][member] query daftar member gagal: ' . $e->getMessage());
+    try {
+        $customers = $db->query("SELECT id, name, phone, member_code, member_level, points, 'retail' AS price_level FROM customers WHERE status = 'active' ORDER BY name ASC")->fetchAll();
+        error_log('[POS][member] fallback tanpa price_level dipakai — jalankan menu System Upgrade.');
+    } catch (Throwable $e2) {
+        error_log('[POS][member] fallback gagal: ' . $e2->getMessage());
+        $customers = [];
+        $customerLoadError = $e2->getMessage();
+    }
 }
 
 $memberPointValue = pos_theme_point_value();
@@ -1059,6 +1070,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 <link rel="stylesheet" href="<?= legacy_base_url('assets/css/locations.css?v=' . APP_ASSET_VERSION); ?>">
 
 <style>
+.member-empty-note.pos-member-error{color:#c0392b;display:block;margin-top:6px;}
 .pos-member-add-link,
 a.pos-member-add-link {
     display: inline-flex !important;
@@ -1277,7 +1289,9 @@ a.pos-member-add-link {
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <?php if (!$customers): ?><small class="member-empty-note">Belum ada member aktif. Tambahkan member baru terlebih dahulu.</small><?php endif; ?>
+                    <?php if ($customerLoadError !== ''): ?>
+                        <small class="member-empty-note pos-member-error"><i class="bi bi-exclamation-triangle-fill"></i> Gagal memuat daftar member: <?= e($customerLoadError); ?> — buka menu System Upgrade lalu muat ulang halaman ini.</small>
+                    <?php elseif (!$customers): ?><small class="member-empty-note">Belum ada member aktif. Tambahkan member baru terlebih dahulu.</small><?php endif; ?>
                     <div class="member-redeem-row">
                         <div>
                             <small id="memberInfoTheme">Pilih member pelanggan untuk mendapat atau menukar poin.</small>
