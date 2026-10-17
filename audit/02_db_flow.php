@@ -1,6 +1,6 @@
 <?php
 /**
- * AUDIT 2 — Pemetaan alur database v17.0.16 di DB lokal.
+ * AUDIT 2 — Pemetaan alur database v17.0.22 di DB lokal.
  * Meniru halaman /admin/system-upgrade/index.php (yang memuat app/bootstrap.php + app/Modules/System).
  * Jalankan: php audit/02_db_flow.php
  */
@@ -147,6 +147,6 @@ echo "tipe kolom kunci     : " . implode(', ', $cols) . " (harus datetime/date/t
 // --------------------------------------------------------------- KESIMPULAN
 echo "\n" . str_repeat('-', 78) . "\n";
 $ok = count($gagal) === 0 && count($gagal2) === 0 && count($gagal3) === 0 && !$tabelHilang && !$kolomKurang && !$idxKurang && count($add2) === 0 && $pulih === count($target);
-echo $ok ? "KESIMPULAN: ALUR DB v17.0.16 KONSISTEN & IDEMPOTEN di baseline sintetis.\n"
+echo $ok ? "KESIMPULAN: ALUR DB v17.0.22 KONSISTEN & IDEMPOTEN di baseline sintetis.\n"
          : "KESIMPULAN: ADA TEMUAN DI ATAS — selesaikan dulu sebelum deploy.\n";
 exit($ok ? 0 : 1);
