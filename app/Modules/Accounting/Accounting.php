@@ -84,6 +84,46 @@ function accounting_number($value): float
     return is_numeric($value) ? (float)$value : 0.0;
 }
 
+/**
+ * V17.0.23 — Nilai persediaan SATU sumber untuk Dashboard, Laporan Stok, dan Akuntansi.
+ * Basis per CABANG (product_branch_stocks) — sama seperti KPI "Nilai Persediaan" di Akuntansi:
+ *   - produk dengan harga beli > 0        : stok cabang x harga beli produk
+ *   - produk harga beli induk 0 (varian)  : stok varian cabang x HPP varian (variant-aware)
+ * $branchId = 0 berarti seluruh cabang.
+ */
+function accounting_inventory_value(PDO $db, int $branchId = 0): float
+{
+    $value = 0.0;
+    if (!accounting_table_exists($db, 'product_branch_stocks') || !accounting_table_exists($db, 'products')) {
+        return $value;
+    }
+
+    $filter = $branchId > 0 ? ' AND pbs.branch_id = ?' : '';
+    $params = $branchId > 0 ? [$branchId] : [];
+    $rows = accounting_query($db, "
+        SELECT COALESCE(SUM(GREATEST(0, COALESCE(pbs.stock,0)) * COALESCE(p.purchase_price,0)),0) AS value
+        FROM product_branch_stocks pbs
+        INNER JOIN products p ON p.id = pbs.product_id
+        WHERE p.purchase_price > 0{$filter}
+    ", $params);
+    $value += accounting_number($rows[0]['value'] ?? 0);
+
+    if (accounting_table_exists($db, 'marketplace_product_variant_stocks')
+        && accounting_table_exists($db, 'marketplace_product_variants')) {
+        $filterV = $branchId > 0 ? ' AND mvs.branch_id = ?' : '';
+        $rows = accounting_query($db, "
+            SELECT COALESCE(SUM(GREATEST(0, COALESCE(mvs.stock,0)) * COALESCE(mv.purchase_price,0)),0) AS value
+            FROM marketplace_product_variant_stocks mvs
+            INNER JOIN marketplace_product_variants mv ON mv.id = mvs.variant_id AND mv.is_active = 1
+            INNER JOIN products p ON p.id = mv.product_id AND p.purchase_price <= 0
+            WHERE mvs.stock > 0{$filterV}
+        ", $params);
+        $value += accounting_number($rows[0]['value'] ?? 0);
+    }
+
+    return $value;
+}
+
 function accounting_payment_label(string $method): string
 {
     $method = strtolower(trim($method));

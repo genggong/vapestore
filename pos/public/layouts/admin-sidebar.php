@@ -55,6 +55,7 @@ menu_link('categories.view', 'admin/categories/index.php', 'bi-tags-fill', 'Kate
             menu_link('suppliers.view', 'admin/suppliers/index.php', 'bi-truck-front-fill', 'Supplier', $currentPath);
             menu_link('stock.view', 'admin/stock/index.php', 'bi-inboxes-fill', 'Stok Barang', $currentPath);
             menu_link('stock.view', 'admin/warehouse/index.php', 'bi-buildings-fill', 'Gudang', $currentPath);
+            menu_link('stock.view', 'admin/warehouse/edit-stock.php', 'bi-pencil-square', 'Edit Stok', $currentPath);
             menu_link('settings.view', 'admin/marketplace-couriers/index.php', 'bi-bicycle', 'Kurir Toko', $currentPath);
             menu_link('settings.view', 'admin/marketplace-courier-rates/index.php', 'bi-geo-alt-fill', 'Tarif Kurir Toko', $currentPath);
                         menu_link('stock.view', 'admin/locations/index.php', 'bi-geo-alt-fill', 'Rak / Lokasi', $currentPath);

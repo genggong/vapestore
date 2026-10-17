@@ -30,12 +30,22 @@ function safe_sum(PDO $db, string $table, string $field, string $where = '1=1'):
 // Versi ringan: TANPA subquery GROUP BY — q1 hanya produk dgn hb>0, q2 hanya varian
 // milik produk hb<=0 (umumnya sedikit). Index products PK & uniq variant_branch cukup.
 function dashboard_stock_value(PDO $db): float {
+    // V17.0.23: nilai modal stok dashboard = perhitungan Akuntansi (satu sumber, basis per cabang).
+    foreach ([
+        __DIR__ . '/../../app/Modules/Accounting/Accounting.php',
+        __DIR__ . '/../../../app/Modules/Accounting/Accounting.php',
+    ] as $module) {
+        if (is_file($module)) { require_once $module; break; }
+    }
+    if (function_exists('accounting_inventory_value')) {
+        try { return (float) accounting_inventory_value($db); } catch (Throwable $e) {}
+    }
+    // Fallback: query lama (basis stok master) bila modul akuntansi tidak tersedia.
     $v = 0.0;
     try {
         $v += (float)$db->query(
             "SELECT COALESCE(SUM(GREATEST(0,COALESCE(p.stock,0))*COALESCE(p.purchase_price,0)),0)
-             FROM products p
-             WHERE p.purchase_price > 0"
+             FROM products p WHERE p.purchase_price > 0"
         )->fetchColumn();
     } catch (Throwable $e) {}
     try {
