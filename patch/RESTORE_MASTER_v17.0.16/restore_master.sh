@@ -26,15 +26,17 @@ fi
 
 TS=$(date +%Y%m%d_%H%M%S)
 ZIP_TMP="/tmp/master_code_$TS.zip"
+BACKUP=~/backup_code_$TS.tar.gz
+_n=1; while [ -e "$BACKUP" ]; do _n=$((_n+1)); BACKUP=~/backup_code_${TS}_$_n.tar.gz; done
 echo "===[0/6] Docroot: $(pwd)  ->  target v$VERSION"
 echo -n "    versi sekarang: "; cat VERSION 2>/dev/null || echo "(tidak diketahui)"
 
 # --- 1. BACKUP: apa pun yang terjadi setelah ini, ada titik pulang ---
-echo "===[1/6] Backup kode saat ini -> ~/backup_code_$TS.tar.gz"
-tar czf ~/backup_code_$TS.tar.gz \
+echo "===[1/6] Backup kode saat ini -> $BACKUP"
+tar czf "$BACKUP" \
     --exclude='uploads' --exclude='storage/backups' --exclude='backup_*' --exclude='_backup_stray_*' \
     . 2>/dev/null
-echo "    selesai ($(du -h ~/backup_code_$TS.tar.gz 2>/dev/null | cut -f1)) — uploads/media tidak ikut, tetap aman di server"
+echo "    selesai ($(du -h "$BACKUP" 2>/dev/null | cut -f1)) — uploads/media tidak ikut, tetap aman di server"
 
 # --- 2. UNDUH: belum menyentuh satu file pun ---
 echo "===[2/6] Unduh master v$VERSION"
@@ -53,14 +55,25 @@ echo "    zip OK — siap menimpa"
 
 # --- 4. Buang folder nyasar (menutupi route -> 500) ---
 echo "===[4/6] Pindahkan folder NYASAR ke backup"
-mkdir -p ~/_backup_stray_$TS
+STRAY=~/_backup_stray_$TS
+mkdir -p "$STRAY"
 for d in store admin; do
-  if [ -d "$d" ]; then mv "$d" ~/_backup_stray_$TS/ && echo "    dipindah: $d/"; fi
+  if [ -d "$d" ]; then
+    t="$STRAY/$d"; _i=1
+    while [ -e "$t" ]; do _i=$((_i+1)); t="$STRAY/${d}_$_i"; done
+    if mv "$d" "$t"; then
+      echo "    dipindah: $d/ -> $t"
+    else
+      echo "ERROR: gagal memindahkan $d/ — folder ini MENUTUPI route (sumber 500), wajib dipindah."
+      echo "       Pindahkan manual lalu jalankan ulang:  mv $d ~/_backup_stray_manual_$TS/"
+      exit 1
+    fi
+  fi
 done
 
 # --- 5. TIMPA ---
 echo "===[5/6] TIMPA semua file master (overwrite)"
-unzip -o -q "$ZIP_TMP" -d . || { echo "ERROR: gagal unzip — sebagian file mungkin sudah tertimpa. Pulihkan: tar xzf ~/backup_code_$TS.tar.gz"; rm -f "$ZIP_TMP"; exit 1; }
+unzip -o -q "$ZIP_TMP" -d . || { echo "ERROR: gagal unzip — sebagian file mungkin sudah tertimpa. Pulihkan: tar xzf $BACKUP"; rm -f "$ZIP_TMP"; exit 1; }
 rm -f "$ZIP_TMP"
 mkdir -p writable/cache writable/logs writable/session writable/debugbar writable/uploads writable/backups 2>/dev/null
 rm -f writable/cache/* legacy/storage/cache/* pos/writable/cache/* 2>/dev/null
@@ -88,7 +101,7 @@ if [ "$V" = "$VERSION" ]; then
 else
   echo "PERINGATAN: VERSION di server = '${V}' (harusnya $VERSION). Cek hasil unduhan zip."
 fi
-echo "Backup      : ~/backup_code_$TS.tar.gz  |  folder nyasar: ~/_backup_stray_$TS"
+echo "Backup      : $BACKUP  |  folder nyasar: $STRAY"
 echo "WAJIB       : LiteSpeed Cache Manager -> Purge All, baru tes situs."
 echo "NOTE        : perubahan DB (index/tabel dari 'Jalankan Upgrade Otomatis') TIDAK ikut dirollback."
 echo "Tes         : /  |  /produk  |  /store  |  /kurir/login  |  /admin/system-upgrade/index.php"
