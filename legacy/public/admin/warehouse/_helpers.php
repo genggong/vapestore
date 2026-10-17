@@ -56,8 +56,17 @@ function warehouse_install(PDO $db): void
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     if ((int)$db->query("SELECT COUNT(*) FROM warehouses")->fetchColumn() === 0) {
-        $stmt = $db->prepare("INSERT INTO warehouses (code,name,phone,address,is_main,is_active,note) VALUES ('GDG-UTAMA','Gudang Utama',?,?,1,1,'Gudang pusat persediaan supplier')");
-        $stmt->execute([setting('store_phone', ''), setting('store_address', '')]);
+        // Pastikan kolom ada dulu (dump lama hanya punya id,code,name,is_active) lalu INSERT
+        // dibungkus try/catch: kegagalan gudang default TIDAK boleh membatalkan tabel lain di bawahnya.
+        foreach ([['phone','VARCHAR(50) NULL'],['address','TEXT NULL'],['is_main','TINYINT(1) NOT NULL DEFAULT 0'],['note','TEXT NULL']] as [$col,$def]) {
+            if (!warehouse_column_exists($db,'warehouses',$col)) {
+                try { $db->exec("ALTER TABLE warehouses ADD COLUMN `$col` $def"); } catch (Throwable $e) {}
+            }
+        }
+        try {
+            $stmt = $db->prepare("INSERT INTO warehouses (code,name,phone,address,is_main,is_active,note) VALUES ('GDG-UTAMA','Gudang Utama',?,?,1,1,'Gudang pusat persediaan supplier')");
+            $stmt->execute([setting('store_phone', ''), setting('store_address', '')]);
+        } catch (Throwable $e) { /* gudang default opsional */ }
     }
 
     $db->exec("CREATE TABLE IF NOT EXISTS warehouse_stocks (

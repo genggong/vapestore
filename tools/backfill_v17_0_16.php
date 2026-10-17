@@ -17,6 +17,10 @@
 
 declare(strict_types=1);
 
+// Output tidak boleh blank: tanpa ini kegagalan fatal di hosting terbaca seperti sukses.
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
+
 // Fallback bootstrap: jalankan dari tools/ (cd repo && php tools/backfill_v17_0_16.php)
 // Pola sama dengan backfill lama yang sudah teruji di hosting (docroot/app):
 // hosting memuat app/bootstrap.php LANGSUNG (bukan legacy/app) + app/Modules.
@@ -179,3 +183,5 @@ try {
     echo '[WARN] Gagal memasang index otomatis: ' . $e->getMessage() . PHP_EOL;
     echo '       Alternatif: buka /admin/system-upgrade/index.php lalu klik "Jalankan Upgrade Otomatis".' . PHP_EOL;
 }
+
+echo 'VK BACKFILL OK: v17.0.16 selesai tanpa error.' . PHP_EOL;

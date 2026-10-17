@@ -71,9 +71,28 @@ for d in store admin; do
   fi
 done
 
-# --- 5. TIMPA ---
+# --- 5. TIMPA (kecuali file konfigurasi milik hosting) ---
 echo "===[5/6] TIMPA semua file master (overwrite)"
-unzip -o -q "$ZIP_TMP" -d . || { echo "ERROR: gagal unzip — sebagian file mungkin sudah tertimpa. Pulihkan: tar xzf $BACKUP"; rm -f "$ZIP_TMP"; exit 1; }
+# File yang WAJIB dipertahankan: konfigurasi DB & setelan server milik hosting ini.
+# docs/DEPLOY_STAGING.md: "build ini mempertahankan konfigurasi database aplikasi lama di
+# legacy/app/Config/database.php" — kalau ditimpa, kredensial DB hilang dan situs mati.
+PRESERVE=""; DIPERTAHANKAN=""
+for f in .htaccess .env php.ini .user.ini pos/php.ini pos/.user.ini \
+         app/Config/Database.php app/Config/database.php \
+         legacy/app/Config/database.php legacy/app/Config/Database.php \
+         pos/app/Config/database.php pos/app/Config/Database.php; do
+  if [ -e "$f" ] && unzip -Z1 "$ZIP_TMP" 2>/dev/null | grep -qx "$f"; then
+    PRESERVE="$PRESERVE $f"
+    DIPERTAHANKAN="$DIPERTAHANKAN $f"
+  fi
+done
+if [ -n "$DIPERTAHANKAN" ]; then echo "    dipertahankan (config hosting):$DIPERTAHANKAN"; fi
+
+if [ -n "$PRESERVE" ]; then
+  unzip -o -q "$ZIP_TMP" -d . -x $PRESERVE || { echo "ERROR: gagal unzip — sebagian file mungkin sudah tertimpa. Pulihkan: tar xzf $BACKUP"; rm -f "$ZIP_TMP"; exit 1; }
+else
+  unzip -o -q "$ZIP_TMP" -d . || { echo "ERROR: gagal unzip — sebagian file mungkin sudah tertimpa. Pulihkan: tar xzf $BACKUP"; rm -f "$ZIP_TMP"; exit 1; }
+fi
 rm -f "$ZIP_TMP"
 mkdir -p writable/cache writable/logs writable/session writable/debugbar writable/uploads writable/backups 2>/dev/null
 rm -f writable/cache/* legacy/storage/cache/* pos/writable/cache/* 2>/dev/null
@@ -94,6 +113,15 @@ grep -q "branch_sync_all_product_stocks" legacy/public/admin/branches/_helpers.p
 grep -q 'haveWs < $needWs'               legacy/public/admin/warehouse/_helpers.php   || { echo "GAGAL: guard sync warehouse"; MOK=0; }
 grep -q "APP_ASSET_VERSION"              legacy/public/layouts/admin-header.php        || { echo "GAGAL: cache-bust aset"; MOK=0; }
 [ "$MOK" = "1" ] && echo "OK (ongkir terpisah, guard sync stok, cache-bust aset)"
+
+# config hosting yang dipertahankan
+for c in legacy/app/Config/database.php app/Config/database.php pos/app/Config/database.php; do
+  if [ -e "$c" ]; then echo "    config DB  : $c  (dipertahankan apa adanya)"; fi
+done
+if [ -f .htaccess ] && ! grep -q 'RewriteRule ^ index.php \[L\]' .htaccess; then
+  echo "    PERINGATAN : .htaccess TIDAK memuat 'RewriteRule ^ index.php [L]' (front-controller CI4)."
+  echo "                 Tambahkan baris itu, atau hapus .htaccess lalu jalankan restore sekali lagi."
+fi
 echo
 
 if [ "$V" = "$VERSION" ]; then

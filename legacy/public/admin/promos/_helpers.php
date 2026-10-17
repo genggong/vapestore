@@ -21,7 +21,20 @@ function ensure_promos_table(PDO $db): void
         $db->exec("ALTER TABLE promos ADD INDEX idx_promos_scope (promo_scope)");
     }
 
-    $db->exec("\n        CREATE TABLE IF NOT EXISTS promo_products (\n            id BIGINT AUTO_INCREMENT PRIMARY KEY,\n            promo_id BIGINT NOT NULL,\n            product_id BIGINT NOT NULL,\n            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            UNIQUE KEY promo_product_unique (promo_id, product_id),\n            INDEX idx_promo_products_promo (promo_id),\n            INDEX idx_promo_products_product (product_id),\n            CONSTRAINT fk_promo_products_promo FOREIGN KEY (promo_id) REFERENCES promos(id) ON DELETE CASCADE\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4\n    ");
+    $db->exec("\n        CREATE TABLE IF NOT EXISTS promo_products (\n            id BIGINT AUTO_INCREMENT PRIMARY KEY,\n            promo_id BIGINT NOT NULL,\n            product_id BIGINT NOT NULL,\n            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            UNIQUE KEY promo_product_unique (promo_id, product_id),\n            INDEX idx_promo_products_promo (promo_id),\n            INDEX idx_promo_products_product (product_id)\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4\n    ");
+
+    // FK dipasang TERPISAH & best-effort: tipe kolom induk (promos.id) bisa beda signedness di dump
+    // lama, dan dulu itu membuat SELURUH CREATE TABLE gagal sehingga tabel promo tak pernah dibuat.
+    foreach ([
+        ['fk_promo_products_promo', 'promo_id', 'promos', 'id', 'CASCADE'],
+    ] as [$fkName, $fkCol, $refTable, $refCol, $onDelete]) {
+        try {
+            $ada = (int)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='promo_products' AND CONSTRAINT_NAME='{$fkName}'")->fetchColumn();
+            if ($ada === 0) {
+                $db->exec("ALTER TABLE promo_products ADD CONSTRAINT `{$fkName}` FOREIGN KEY (`{$fkCol}`) REFERENCES `{$refTable}`(`{$refCol}`) ON DELETE {$onDelete}");
+            }
+        } catch (Throwable $e) { /* tipe tidak cocok: tabel & index tetap ada */ }
+    }
 }
 
 function promo_status_badge(array $promo): string

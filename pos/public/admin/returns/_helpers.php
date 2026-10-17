@@ -20,10 +20,23 @@ function sales_returns_install(PDO $db): void
         KEY idx_sales_returns_transaction (transaction_id),
         KEY idx_sales_returns_user (user_id),
         KEY idx_sales_returns_status (status),
-        KEY idx_sales_returns_date (return_date),
-        CONSTRAINT fk_sales_returns_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
-        CONSTRAINT fk_sales_returns_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        KEY idx_sales_returns_date (return_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // FK dipasang TERPISAH & best-effort: tipe kolom induk di dump lama bisa beda signedness,
+    // dan dulu itu membuat SELURUH CREATE TABLE gagal sehingga tabel modul ini tidak pernah dibuat.
+    // Sekarang tabel + index pasti terbentuk; FK hanya ditambahkan bila tipe kolomnya cocok.
+    foreach ([
+        ['fk_sales_returns_transaction', 'transaction_id', 'transactions', 'id', 'CASCADE'],
+        ['fk_sales_returns_user', 'user_id', 'users', 'id', 'SET NULL'],
+    ] as [$fkName, $fkCol, $refTable, $refCol, $onDelete]) {
+        try {
+            $ada = (int)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='sales_returns' AND CONSTRAINT_NAME='{$fkName}'")->fetchColumn();
+            if ($ada === 0) {
+                $db->exec("ALTER TABLE `sales_returns` ADD CONSTRAINT `{$fkName}` FOREIGN KEY (`{$fkCol}`) REFERENCES `{$refTable}`(`{$refCol}`) ON DELETE {$onDelete}");
+            }
+        } catch (Throwable $e) { /* tipe tidak cocok: tabel & index tetap ada */ }
+    }
+
 
     $db->exec("CREATE TABLE IF NOT EXISTS sales_return_items (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -38,11 +51,24 @@ function sales_returns_install(PDO $db): void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         KEY idx_sales_return_items_return (return_id),
         KEY idx_sales_return_items_trx_item (transaction_item_id),
-        KEY idx_sales_return_items_product (product_id),
-        CONSTRAINT fk_sales_return_items_return FOREIGN KEY (return_id) REFERENCES sales_returns(id) ON DELETE CASCADE,
-        CONSTRAINT fk_sales_return_items_trx_item FOREIGN KEY (transaction_item_id) REFERENCES transaction_items(id) ON DELETE CASCADE,
-        CONSTRAINT fk_sales_return_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+        KEY idx_sales_return_items_product (product_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // FK dipasang TERPISAH & best-effort: tipe kolom induk di dump lama bisa beda signedness,
+    // dan dulu itu membuat SELURUH CREATE TABLE gagal sehingga tabel modul ini tidak pernah dibuat.
+    // Sekarang tabel + index pasti terbentuk; FK hanya ditambahkan bila tipe kolomnya cocok.
+    foreach ([
+        ['fk_sales_return_items_return', 'return_id', 'sales_returns', 'id', 'CASCADE'],
+        ['fk_sales_return_items_trx_item', 'transaction_item_id', 'transaction_items', 'id', 'CASCADE'],
+        ['fk_sales_return_items_product', 'product_id', 'products', 'id', 'SET NULL'],
+    ] as [$fkName, $fkCol, $refTable, $refCol, $onDelete]) {
+        try {
+            $ada = (int)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='sales_return_items' AND CONSTRAINT_NAME='{$fkName}'")->fetchColumn();
+            if ($ada === 0) {
+                $db->exec("ALTER TABLE `sales_return_items` ADD CONSTRAINT `{$fkName}` FOREIGN KEY (`{$fkCol}`) REFERENCES `{$refTable}`(`{$refCol}`) ON DELETE {$onDelete}");
+            }
+        } catch (Throwable $e) { /* tipe tidak cocok: tabel & index tetap ada */ }
+    }
+
 }
 
 function sales_returns_table_exists(PDO $db, string $table): bool

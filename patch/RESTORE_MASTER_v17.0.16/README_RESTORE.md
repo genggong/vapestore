@@ -43,7 +43,27 @@ Urutan penting: **backup → unduh → uji → baru timpa**. Kalau unduhan gagal
 - **Perubahan database** (tabel/index dari "Jalankan Upgrade Otomatis") — file restore tidak me-rollback DDL. Index tambahan aman dibiarkan.
 - **File di `uploads/` dan `storage/backups/`** — media live tidak pernah ditimpa.
 - **`.env`** — tidak ada di dalam zip, jadi kredensial aman.
-- **`hash.php`** — utility lama yang membocorkan hash password (isi default `admin123`) sengaja **tidak** dikirim lagi di master. Hapus file itu di hosting kalau masih ada.
+- **Konfigurasi milik hosting — DIJAGA, tidak pernah ditimpa:** `.htaccess`, `php.ini`, `.user.ini`,
+  dan `*/app/Config/database.php` / `*/app/Config/Database.php` yang sudah ada di server. Ini sesuai
+  `docs/DEPLOY_STAGING.md` ("build ini mempertahankan konfigurasi database aplikasi lama"), dan penting
+  karena kalau kredensial DB ikut tertimpa, situs langsung mati "Koneksi database gagal".
+  Script juga memperingatkan bila `.htaccess` tidak memuat `RewriteRule ^ index.php [L]`.
+- **`pos/app/Config/database.php`** — file ini di repo memuat kredensial asli, jadi **tidak** dikirim
+  di snapshot. Restore mempertahankan versi milik server; kalau file itu belum ada di server,
+  isi manual sesuai database setempat.
+- **`hash.php`** — utility lama yang membocorkan hash password (isi default `admin123`) sengaja
+  **tidak** dikirim lagi di master. Hapus file itu di hosting kalau masih ada.
+
+## Hasil audit sebelum rilis ini (bukan klaim, semua dijalankan)
+
+- 1.551 file PHP: `php -l` bersih; test bawaan repo 22/22 hijau.
+- Alur DB (`vk_sys_upgrade`) dijalankan di MySQL lokal dari baseline "dump lama": **228 langkah, 0 GAGAL,
+  0 SKIP**, 39/39 tabel harapan lengkap, 0 kolom kurang, 0 index kurang, dan **idempotent** (tekan dua kali = tidak ada perubahan baru).
+- Semua tabel/kolom yang dirujuk 298 file PHP rilis ada di skema hasil repair (**0 rujukan hilang**).
+- Restore diuji di docroot tiruan: 38/38 cek lulus, termasuk kredensial DB + `.htaccess` + `php.ini` hosting tetap utuh,
+  zip rusak / unduhan gagal tidak mengubah apa pun, dan folder nyasar tetap dipindah walau dijalankan 2x dalam detik yang sama.
+- `tools/apply_patch_v17_0_16.sh` sekarang mem-backup **dari isi patch zip**: 303 file ditimpa → 303 file `.bak`
+  + `full_docroot.tar.gz` (sebelumnya hanya 52 file yang di-backup dari daftar manual).
 
 ## Rollback
 

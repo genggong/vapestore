@@ -86,10 +86,22 @@ function ensure_role_permissions_table(PDO $db): void
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY role_permission_unique (role_id, permission_key),
-            INDEX idx_role_permissions_role (role_id),
-            CONSTRAINT fk_role_permissions_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+            INDEX idx_role_permissions_role (role_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
+    // FK dipasang TERPISAH & best-effort: tipe kolom induk di dump lama bisa beda signedness,
+    // dan dulu itu membuat SELURUH CREATE TABLE gagal sehingga tabel modul ini tidak pernah dibuat.
+    // Sekarang tabel + index pasti terbentuk; FK hanya ditambahkan bila tipe kolomnya cocok.
+    foreach ([
+        ['fk_role_permissions_role', 'role_id', 'roles', 'id', 'CASCADE'],
+    ] as [$fkName, $fkCol, $refTable, $refCol, $onDelete]) {
+        try {
+            $ada = (int)$db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='role_permissions' AND CONSTRAINT_NAME='{$fkName}'")->fetchColumn();
+            if ($ada === 0) {
+                $db->exec("ALTER TABLE `role_permissions` ADD CONSTRAINT `{$fkName}` FOREIGN KEY (`{$fkCol}`) REFERENCES `{$refTable}`(`{$refCol}`) ON DELETE {$onDelete}");
+            }
+        } catch (Throwable $e) { /* tipe tidak cocok: tabel & index tetap ada */ }
+    }
 }
 
 function seed_default_role_permissions(PDO $db): void

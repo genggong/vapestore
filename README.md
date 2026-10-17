@@ -3,7 +3,9 @@
 Sistem POS + Marketplace + Akuntansi (CodeIgniter 4, PHP 8.x, MySQL).
 
 ## Versi
-- **v17.0.11** — fix penjualan online masuk laporan POS + ongkir terpisah dari gross profit
+- **v17.0.16** — nilai modal stok konsisten (Laporan Stok / Stock Opname / Excel / Akuntansi), ongkir
+  terpisah sebagai Pendapatan Ongkir, HPP rata-rata tertimbang (`avg_hpp`), dan Request Stock pakai
+  `CatalogFast`. (README ini sempat tertinggal di v17.0.11 — angka versi yang berlaku adalah isi file `VERSION`.)
 - CodeIgniter 4.7.4, front-controller CI4 + modul legacy teroptimasi
 
 ## Installasi
@@ -16,9 +18,19 @@ Sistem POS + Marketplace + Akuntansi (CodeIgniter 4, PHP 8.x, MySQL).
    export VAPEKONG_DB_PASS=password_anda
    ```
    (atau edit `app/Config/database.php` / `legacy/app/Config/database.php`)
-3. Import skema `database/*.sql` (tidak disertakan data produksi di repo ini)
+3. **Skema database tidak dikirim dalam repo ini** (tidak ada file `database/*.sql`). Tabel inti sudah
+   ada di instalasi lama; tabel & kolom tambahan dibuat oleh aplikasi sendiri lewat halaman
+   **Database & System Doctor** (`/admin/system-upgrade/index.php` → *Jalankan Upgrade Otomatis*),
+   yang idempotent dan hanya menambah — tidak pernah menghapus produk/order.
 4. Arahkan web root ke folder `public/` (CI4) — legacy diakses via front-controller
 5. Jalankan `composer install` di root bila perlu
+
+## Update/restore satu perintah (dari document root)
+```bash
+wget -qO update.sh "https://raw.githubusercontent.com/genggong/vapestore/main/patch/UPDATE_VAPEKONG.sh" && bash update.sh
+```
+Backup dulu, unduh master terbaru, uji zip, baru menimpa; konfigurasi DB & setelan hosting dipertahankan.
+Panduan lengkap: `patch/RESTORE_MASTER_v17.0.16/README_RESTORE.md`.
 
 ## Struktur
 - `app/` — aplikasi CodeIgniter 4

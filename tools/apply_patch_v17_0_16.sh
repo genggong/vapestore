@@ -19,70 +19,28 @@ fi
 echo "==> Docroot: $(pwd)"
 echo "==> Backup file lama ke: ${BACKUP_DIR}/"
 
-# --- backup file yang akan ditimpa ---
-mkdir -p "${BACKUP_DIR}"
-while IFS= read -r f; do
-  [ -f "$f" ] || continue
-  mkdir -p "${BACKUP_DIR}/$(dirname "$f")"
-  cp -p "$f" "${BACKUP_DIR}/${f}.bak" 2>/dev/null || true
-done <<'EOF'
-legacy/app/Modules/Accounting/Accounting.php
-legacy/public/admin/accounting/index.php
-legacy/public/admin/accounting/export.php
-legacy/public/admin/purchases/_helpers.php
-legacy/public/admin/purchases/create.php
-legacy/public/admin/stock-requests/action.php
-legacy/public/admin/stock-requests/create.php
-legacy/public/admin/stock-requests/index.php
-legacy/public/admin/stock-requests/detail.php
-legacy/public/admin/reports/stock.php
-legacy/public/assets/js/stock-request.js
-legacy/app/Modules/CatalogFast.php
-legacy/public/admin/system-upgrade/index.php
-legacy/app/Modules/System/SystemUpgrade.php
-legacy/public/admin/dashboard.php
-legacy/public/admin/branches/_helpers.php
-legacy/public/admin/warehouse/_helpers.php
-app/Modules/Accounting/Accounting.php
-app/Modules/CatalogFast.php
-app/Modules/System/SystemUpgrade.php
-public/admin/dashboard.php
-public/admin/branches/_helpers.php
-public/admin/warehouse/_helpers.php
-pos/app/Modules/System/SystemUpgrade.php
-pos/public/admin/dashboard.php
-pos/public/admin/branches/_helpers.php
-pos/public/admin/warehouse/_helpers.php
-public/admin/accounting/index.php
-public/admin/accounting/export.php
-public/admin/purchases/_helpers.php
-public/admin/purchases/create.php
-public/admin/stock-requests/action.php
-public/admin/stock-requests/create.php
-public/admin/stock-requests/index.php
-public/admin/stock-requests/detail.php
-public/admin/reports/stock.php
-public/assets/js/stock-request.js
-pos/app/Modules/Accounting/Accounting.php
-pos/app/Modules/CatalogFast.php
-pos/public/admin/accounting/index.php
-pos/public/admin/accounting/export.php
-pos/public/admin/purchases/_helpers.php
-pos/public/admin/purchases/create.php
-pos/public/admin/stock-requests/action.php
-pos/public/admin/stock-requests/create.php
-pos/public/admin/stock-requests/index.php
-pos/public/admin/stock-requests/detail.php
-pos/public/admin/reports/stock.php
-pos/public/assets/js/stock-request.js
-assets/js/stock-request.js
-tools/backfill_v17_0_16.php
-VERSION
-EOF
-
-# --- unduh patch (overwrite PAKSa - unzip -o) ---
+# --- unduh patch DULU, lalu backup diambil dari ISI ZIP (bukan daftar manual) ---
 echo "==> Unduh patch..."
-wget -qO "${ZIP}" "${ZIP_URL}"
+wget -qO "${ZIP}" "${ZIP_URL}" || { echo "ERROR: gagal unduh ${ZIP_URL}"; exit 1; }
+unzip -t -q "${ZIP}" || { echo "ERROR: zip patch rusak — tidak ada file yang diubah"; rm -f "${ZIP}"; exit 1; }
+
+echo "==> Backup file lama ke: ${BACKUP_DIR}/"
+mkdir -p "${BACKUP_DIR}"
+N_BACKUP=0; N_BARU=0; N_SKIP=0
+while IFS= read -r f; do
+  case "$f" in ""|*/) continue;; esac
+  if [ -f "$f" ]; then
+    mkdir -p "${BACKUP_DIR}/$(dirname "$f")"
+    cp -p "$f" "${BACKUP_DIR}/${f}.bak" && N_BACKUP=$((N_BACKUP+1)) || N_SKIP=$((N_SKIP+1))
+  else
+    N_BARU=$((N_BARU+1))   # file baru (belum ada di server) -> tidak ada yang perlu di-backup
+  fi
+done < <(unzip -Z1 "${ZIP}")
+echo "    ${N_BACKUP} file lama di-backup, ${N_BARU} file baru, ${N_SKIP} gagal. Tiap file yang DITIMPA punya .bak."
+tar czf "${BACKUP_DIR}/full_docroot.tar.gz" --exclude='uploads' --exclude='backup_*' --exclude='_backup_stray_*' . 2>/dev/null \
+  && echo "    cadangan penuh: ${BACKUP_DIR}/full_docroot.tar.gz" || echo "    (cadangan penuh dilewati)"
+
+# --- timpa (overwrite pakai unzip -o) ---
 unzip -o "${ZIP}"
 rm -f "${ZIP}"
 
