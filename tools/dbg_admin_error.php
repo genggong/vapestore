@@ -59,6 +59,14 @@ try {
     require $target;
     $out = ob_get_clean();
     echo "STATUS: halaman selesai TANPA error (HTML " . strlen($out) . " byte)\n";
+    // V17.0.19: hitung penanda penting supaya bisa dibedakan "halaman kosong" vs "file ketinggalan versi"
+    $markers = ['data-product-group','request-product-row','stock-pill','request-product-list','request-cart-items','member-result-btn'];
+    $found = [];
+    foreach ($markers as $mk) {
+        $n = substr_count($out, $mk);
+        if ($n > 0) $found[] = $mk . '=' . $n;
+    }
+    echo 'PENANDA   : ' . ($found ? implode(' | ', $found) : '(tidak ada penanda dikenali)') . "\n";
 } catch (Throwable $e) {
     $out = ob_get_clean();
     echo "STATUS: GAGAL setelah render " . strlen($out) . " byte\n\n";

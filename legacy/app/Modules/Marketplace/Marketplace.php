@@ -84,6 +84,7 @@ function marketplace_theme_presets(): array
         'pink' => ['name' => 'Pink', 'primary' => '#DB2777', 'secondary' => '#9D174D', 'accent' => '#EC4899'],
         'gold' => ['name' => 'Gold', 'primary' => '#CA8A04', 'secondary' => '#854D0E', 'accent' => '#EAB308'],
         'graphite' => ['name' => 'Graphite', 'primary' => '#334155', 'secondary' => '#0F172A', 'accent' => '#475569'],
+        'monochrome' => ['name' => 'Hitam Putih (Monokrom)', 'primary' => '#111111', 'secondary' => '#000000', 'accent' => '#333333'],
         'custom' => ['name' => 'Custom', 'primary' => '#7C3AED', 'secondary' => '#5B21B6', 'accent' => '#A855F7'],
     ];
 }
