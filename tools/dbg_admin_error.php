@@ -67,6 +67,17 @@ try {
         if ($n > 0) $found[] = $mk . '=' . $n;
     }
     echo 'PENANDA   : ' . ($found ? implode(' | ', $found) : '(tidak ada penanda dikenali)') . "\n";
+    // V17.0.20b: tunjukkan potongan HTML asli area daftar produk supaya bisa dibedakan
+    // "HTML kosong" vs "HTML ada tapi tidak terlihat (CSS)".
+    if (isset($_GET['snippet'])) {
+        foreach (['requestProductList', 'request-product-row', 'request-parent-heading'] as $needle) {
+            $pos = strpos($out, $needle);
+            echo "\n--- SNIPPET '$needle' (offset " . ($pos === false ? 'TIDAK DITEMUKAN' : $pos) . ") ---\n";
+            if ($pos !== false) {
+                echo preg_replace('/\s+/', ' ', substr($out, max(0, $pos - 120), 700)) . "\n";
+            }
+        }
+    }
 } catch (Throwable $e) {
     $out = ob_get_clean();
     echo "STATUS: GAGAL setelah render " . strlen($out) . " byte\n\n";
