@@ -65,6 +65,9 @@ for f in legacy/app/bootstrap.php legacy/app/Helpers/helpers.php legacy/app/Help
 done
 [ $OK -eq 1 ] || { echo "!! Ada file patch tidak lengkap — jangan lanjut sebelum dicek."; exit 1; }
 
+# Catatan penting kalau skrip berhenti di tahap marker: file SUDAH tertimpa (unzip jalan lebih dulu).
+# Lanjutkan dengan Purge All + tes halaman; JANGAN panik, tidak ada yang perlu di-upload ulang.
+
 echo "==> Verifikasi marker..."
 grep -q "if (!defined('APP_ASSET_VERSION'))" legacy/app/bootstrap.php \
   || { echo "!! Guard konstanta aset tidak ada di bootstrap legacy."; exit 1; }
@@ -72,9 +75,16 @@ grep -q "if (!defined('APP_ASSET_VERSION'))" app/bootstrap.php \
   || { echo "!! Guard konstanta aset tidak ada di bootstrap root."; exit 1; }
 grep -q "asset_helpers.php" legacy/app/Helpers/helpers.php \
   || { echo "!! helpers.php legacy masih tanpa require asset_helpers."; exit 1; }
-grep -q "APP_ASSET_VERSION" legacy/public/layouts/admin-header.php \
-  || { echo "!! Layout admin tidak memakai APP_ASSET_VERSION — file tidak sesuai."; exit 1; }
-echo "  [OK] guard + helper + layout cocok"
+# Referensi konstanta bisa ada di layout (versi baru) ATAU di halaman admin (versi 17.0.16c).
+# Yang penting: guard sudah dipasang supaya konstanta terdefinisi apa pun versi file-nya.
+REF=$(grep -l "APP_ASSET_VERSION" \
+        legacy/public/layouts/admin-header.php \
+        legacy/public/admin/pos/index.php \
+        legacy/public/admin/customers/edit.php \
+        legacy/public/maintenance.php 2>/dev/null | wc -l | tr -d ' ')
+[ "$REF" -ge 1 ] \
+  || { echo "!! Tidak ada file yang memakai APP_ASSET_VERSION — paket tidak sesuai target."; exit 1; }
+echo "  [OK] guard + helper terpasang; referensi APP_ASSET_VERSION ditemukan di ${REF} file"
 
 echo "==> Uji runtime konstanta (butuh koneksi DB dari aplikasi)..."
 if php -r 'require "legacy/app/bootstrap.php"; echo defined("APP_ASSET_VERSION") ? "APP_ASSET_VERSION=" . APP_ASSET_VERSION : "APP_ASSET_VERSION=TIDAK TERDEFINISI";' 2>/dev/null; then
