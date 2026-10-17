@@ -44,6 +44,11 @@ for f in $FILES; do
   cp -p "$f" "${BACKUP_DIR}/${f}.bak" 2>/dev/null || true
 done
 echo "    (file lama tersimpan: $(find "${BACKUP_DIR}" -name '*.bak' | wc -l) file)"
+# Cadangan PENUH sebagai jaring pengaman kedua: kalau ada file di luar daftar yang ikut tertimpa,
+# masih bisa dipulihkan. Media uploads tidak ikut (sudah aman di server).
+tar czf "${BACKUP_DIR}/full_docroot.tar.gz" --exclude='uploads' --exclude='backup_*' --exclude='_backup_stray_*' . 2>/dev/null \
+  && echo "    cadangan penuh: ${BACKUP_DIR}/full_docroot.tar.gz" || echo "    (cadangan penuh dilewati)"
+
 
 echo "==> Unduh patch..."
 if ! wget -qO "${ZIP}" "${ZIP_URL}"; then
