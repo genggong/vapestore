@@ -73,6 +73,24 @@ Lalu **WAJIB**: cPanel → **LiteSpeed Cache Manager → Purge All**, dan buka
    sekarang ada pesan merah penyebabnya (bukan sekadar "Belum ada member aktif").
 4. `/admin/system-upgrade/index.php` menampilkan **v17.0.17**.
 
+## Perbaikan penuh / restore (kalau situs 500 atau file patut dicurigai)
+
+Snapshot master v17.0.17 sudah disertakan, jadi perintah pemulihan tetap sama:
+
+```bash
+cd ~/public_html
+wget -qO update.sh "https://raw.githubusercontent.com/genggong/vapestore/main/patch/UPDATE_VAPEKONG.sh"
+bash update.sh            # jalan kalau versi server != 17.0.17
+bash update.sh --force    # paksa timpa ulang (mode perbaikan)
+```
+
+`update.sh` membaca `patch/latest.txt` (kini `17.0.17|RESTORE_MASTER_v17.0.17`) lalu memanggil
+`restore_master.sh` v17.0.17: backup → unduh → uji zip → pindahkan folder nyasar → timpa → verifikasi.
+Marker yang diverifikasi kini termasuk `marketplace_password_hash` (create.php),
+`Password Marketplace` (edit.php tree public), dan `$customerLoadError` (guard input member POS).
+Perbaikan kecil: VERSION yang korup/kosong tidak lagi dianggap "lebih baru" (sebelumnya `sort -V`
+menempatkan string non-numerik di atas angka sehingga update berhenti).
+
 ## Rollback
 
 ```bash

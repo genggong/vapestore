@@ -38,6 +38,12 @@ if [ "$FORCE" = "0" ]; then
     echo "    Untuk memaksa timpa ulang (mode perbaikan):  bash update.sh --force"
     exit 0
   fi
+  # VERSION korup/kosong tidak boleh dianggap "lebih baru" oleh sort -V (string non-numerik
+  # selalu terurut setelah angka) — kalau tidak valid, anggap belum diketahui lalu lanjut timpa.
+  if [ -n "$CUR" ] && ! printf '%s' "$CUR" | grep -qE '^[0-9]+(\.[0-9]+)+$'; then
+    echo "==> VERSION di server tidak valid ('$CUR') — dianggap belum diketahui, master v$LATEST akan ditimpakan."
+    CUR=""
+  fi
   if [ -n "$CUR" ] && [ "$(printf '%s\n%s\n' "$CUR" "$LATEST" | sort -V | tail -1)" = "$CUR" ]; then
     echo "==> Versi di server ($CUR) lebih baru dari master repo ($LATEST). Berhenti demi aman."
     echo "    Untuk memaksa turun versi:  bash update.sh --force"
