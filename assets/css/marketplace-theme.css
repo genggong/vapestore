@@ -119,3 +119,8 @@ body.theme-template-dark .store-footer{background:#111111!important;border-color
   .store-nav{border-color:var(--mp-line)!important;background:var(--mp-surface)!important;box-shadow:0 22px 50px rgba(var(--mp-rgb),.13)!important}
   body.theme-template-dark .store-nav{background:#111111!important;border-color:#111111!important}
 }
+
+/* V17.0.27 — kartu Poin Member (latar gelap): label & angka dibuat PUTIH agar terbaca */
+.account-points span,.member-points-card span{color:#fff!important;opacity:.9}
+.account-points strong,.member-points-card strong{color:#fff!important}
+.account-points i,.member-points-card i{background:rgba(255,255,255,.18)!important;color:#fff!important}

@@ -35,8 +35,8 @@ $storeFavicon = storefront_visual_url($store['marketplace_favicon'] ?? '', 'favi
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="<?= base_url('assets/css/storefront.css?v=17.0.20'); ?>" rel="stylesheet">
-    <link href="<?= base_url('assets/css/marketplace-theme.css?v=17.0.20'); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/storefront.css?v=' . (defined('APP_ASSET_VERSION') ? APP_ASSET_VERSION : '17.0.27')); ?>" rel="stylesheet">
+    <link href="<?= base_url('assets/css/marketplace-theme.css?v=' . (defined('APP_ASSET_VERSION') ? APP_ASSET_VERSION : '17.0.27')); ?>" rel="stylesheet">
 </head>
 <body class="storefront-body theme-template-<?= e($marketplaceTheme['template']); ?> theme-preset-<?= e($marketplaceTheme['preset']); ?> <?= e(trim((string)($bodyClass ?? ''))); ?>" data-store-name="<?= e($store['store_name']); ?>" data-wishlist-url="<?= e(base_url('store/api/wishlist-toggle.php')); ?>" data-marketplace-auth="<?= $storeCustomerId > 0 ? '1' : '0'; ?>" data-login-url="<?= e(base_url('masuk')); ?>" data-csrf="<?= e(CSRF::token()); ?>">
 <div class="store-page-loader" id="storePageLoader" aria-hidden="true">
