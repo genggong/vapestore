@@ -1117,6 +1117,41 @@ function marketplace_expire_if_needed(PDO $db, array $order): array
     return $order;
 }
 
+/**
+ * V17.0.38 — Ambil di Toko lewat batas: batalkan otomatis (belum dibayar) & kembalikan stok.
+ */
+function marketplace_pickup_expire_if_needed(PDO $db, array $order): array
+{
+    if (empty($order) || strtolower((string) ($order['courier_code'] ?? '')) !== 'pickup') return $order;
+    if (empty($order['pickup_deadline_at']) || !empty($order['stock_released_at'])) return $order;
+    if (!in_array((string) ($order['payment_status'] ?? ''), ['pending', 'unpaid', 'error'], true)) return $order;
+    if (!in_array((string) ($order['order_status'] ?? ''), ['pending_payment', 'pending', 'confirmed', 'processing'], true)) return $order;
+
+    // Bandingkan di MySQL supaya tidak terpengaruh beda timezone PHP vs DB.
+    try {
+        $chk = $db->prepare('SELECT (pickup_deadline_at IS NOT NULL AND pickup_deadline_at < NOW()) FROM online_orders WHERE id=?');
+        $chk->execute([(int) $order['id']]);
+        if ((int) $chk->fetchColumn() !== 1) return $order;
+    } catch (Throwable $e) {
+        $deadline = strtotime((string) $order['pickup_deadline_at']);
+        if (!$deadline || $deadline >= time()) return $order;
+    }
+    $deadline = strtotime((string) $order['pickup_deadline_at']);
+
+    try {
+        $up = $db->prepare("UPDATE online_orders SET order_status='expired', payment_status=CASE WHEN payment_status IN ('pending','unpaid','error') THEN 'expired' ELSE payment_status END, cancelled_at=COALESCE(cancelled_at,NOW()), updated_at=NOW() WHERE id=? AND order_status=?");
+        $up->execute([(int) $order['id'], (string) $order['order_status']]);
+        if ($up->rowCount() > 0) {
+            marketplace_release_stock($db, (int) $order['id'], 'Batas pengambilan di toko terlewat.');
+            marketplace_add_event($db, (int) $order['id'], 'expired', 'Batas ambil terlewat', 'Pesanan dibatalkan otomatis dan stok dikembalikan karena tidak diambil sampai ' . date('d/m/Y H:i', $deadline) . '.');
+        }
+    } catch (Throwable $e) {
+        return $order;
+    }
+    $fresh = marketplace_get_order($db, (string) $order['order_number'], (string) ($order['public_token'] ?? ''));
+    return $fresh ?: $order;
+}
+
 function marketplace_customer_id(): int
 {
     return max(0, (int) ($_SESSION['marketplace_customer_id'] ?? 0));

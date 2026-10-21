@@ -36,23 +36,32 @@ function marketplace_store_pickup_deadline(?string $createdAt = null): string
     return $deadline;
 }
 
-function marketplace_store_pickup_deadline_passed(array $order): bool
+function marketplace_store_pickup_deadline_passed(array $order, ?PDO $db = null): bool
 {
     $deadline = trim((string) ($order['pickup_deadline_at'] ?? ''));
     if ($deadline === '' || in_array((string) ($order['order_status'] ?? ''), ['completed', 'cancelled', 'expired'], true)) return false;
+    if ($db instanceof PDO && !empty($order['id'])) {
+        try {
+            $st = $db->prepare('SELECT (pickup_deadline_at IS NOT NULL AND pickup_deadline_at < NOW()) FROM online_orders WHERE id=?');
+            $st->execute([(int) $order['id']]);
+            return (int) $st->fetchColumn() === 1;
+        } catch (Throwable $e) {
+            // jatuh ke perbandingan PHP
+        }
+    }
     $ts = strtotime($deadline);
     return $ts !== false && time() > $ts;
 }
 
-function marketplace_store_pickup_deadline_label(array $order): string
+function marketplace_store_pickup_deadline_label(array $order, ?PDO $db = null): string
 {
     $deadline = trim((string) ($order['pickup_deadline_at'] ?? ''));
     if ($deadline === '') return '';
     $ts = strtotime($deadline);
     if ($ts === false) return '';
     $label = date('d M Y H:i', $ts);
+    if (marketplace_store_pickup_deadline_passed($order, $db)) return 'Lewat batas (' . $label . ')';
     if (date('Y-m-d', $ts) === date('Y-m-d')) $label = 'Hari ini, maks ' . date('H:i', $ts);
-    if (marketplace_store_pickup_deadline_passed($order)) return 'Lewat batas (' . $label . ')';
     return $label;
 }
 
