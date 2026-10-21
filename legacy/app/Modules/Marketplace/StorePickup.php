@@ -55,6 +55,8 @@ function marketplace_store_pickup_deadline_passed(array $order, ?PDO $db = null)
 
 function marketplace_store_pickup_deadline_label(array $order, ?PDO $db = null): string
 {
+    // V17.0.41 — pesanan lunas (QRIS/VA/dsb) tidak punya batas ambil.
+    if ((string) ($order['payment_status'] ?? '') === 'paid') return '';
     $deadline = trim((string) ($order['pickup_deadline_at'] ?? ''));
     if ($deadline === '') return '';
     $ts = strtotime($deadline);

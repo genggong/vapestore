@@ -1708,8 +1708,8 @@ function marketplace_create_order(PDO $db, array $payload): array
         }
         if ($requestedCourier === 'pickup') {
             $pickupCode = marketplace_store_pickup_generate_code();
-            // V17.0.35 — batas ambil default hari ini (jam tutup toko).
-            $pickupDeadline = function_exists('marketplace_store_pickup_deadline') ? marketplace_store_pickup_deadline() : null;
+            // V17.0.41 — batas ambil hanya untuk COD (bayar tunai). QRIS/VA yang sudah lunas tanpa expired.
+            $pickupDeadline = ($isCod && function_exists('marketplace_store_pickup_deadline')) ? marketplace_store_pickup_deadline() : null;
             $db->prepare("UPDATE online_orders SET pickup_code=?,pickup_deadline_at=COALESCE(?,pickup_deadline_at),delivery_status='Menunggu diproses untuk pengambilan di toko' WHERE id=?")->execute([$pickupCode,$pickupDeadline,$orderId]);
         }
 
