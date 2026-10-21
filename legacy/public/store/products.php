@@ -6,7 +6,24 @@ $q = trim((string) ($_GET['q'] ?? ''));
 $category = trim((string) ($_GET['category'] ?? ''));
 $sort = trim((string) ($_GET['sort'] ?? 'name'));
 $brand = max(0,(int)($_GET['brand'] ?? 0));
-$products = storefront_products(['limit' => 100, 'search' => $q, 'category' => $category, 'brand'=>$brand, 'sort' => $sort]);
+// V17.0.26: pagination katalog — 24 produk per halaman, nomor halaman di bawah grid.
+$perPage = 24;
+$filters = ['search' => $q, 'category' => $category, 'brand' => $brand, 'sort' => $sort];
+$totalProducts = storefront_products_total($filters);
+$totalPages = max(1, (int)ceil($totalProducts / $perPage));
+$page = max(1, min($totalPages, (int)($_GET['page'] ?? 1)));
+$offset = ($page - 1) * $perPage;
+$products = storefront_products($filters + ['limit' => $perPage, 'offset' => $offset]);
+if (!$products && $page > 1) {
+    // halaman di luar jangkauan (mis. filter menyusut): tampilkan halaman terakhir
+    $page = $totalPages;
+    $offset = ($page - 1) * $perPage;
+    $products = storefront_products($filters + ['limit' => $perPage, 'offset' => $offset]);
+}
+if ($totalProducts <= 0 && $products) $totalProducts = $offset + count($products);
+$shownFrom = $products ? $offset + 1 : 0;
+$shownTo = $products ? $offset + count($products) : 0;
+$pageQuery = ['q' => $q, 'category' => $category, 'brand' => $brand > 0 ? $brand : null, 'sort' => $sort];
 $categories = storefront_categories(20);
 $brands = storefront_brands(50);
 $wishlistIds = storefront_wishlist_ids();
@@ -28,7 +45,7 @@ require __DIR__ . '/_header.php';
         </form>
     </section>
     <section class="store-container catalog-content">
-        <div class="catalog-result-head"><div><span class="eyebrow">HASIL KATALOG</span><h2><?= count($products); ?> Produk ditemukan</h2></div><span class="catalog-sync"><i class="bi bi-arrow-repeat"></i> Sinkron POS</span></div>
+        <div class="catalog-result-head"><div><span class="eyebrow">HASIL KATALOG</span><h2><?= (int)$totalProducts; ?> Produk ditemukan</h2><?php if($totalProducts>0): ?><p class="catalog-range">Menampilkan <?= (int)$shownFrom; ?>–<?= (int)$shownTo; ?> dari <?= (int)$totalProducts; ?> produk • halaman <?= (int)$page; ?>/<?= (int)$totalPages; ?></p><?php endif; ?></div><span class="catalog-sync"><i class="bi bi-arrow-repeat"></i> Sinkron POS</span></div>
         <div class="product-grid catalog-grid">
             <?php if ($products): foreach ($products as $i => $product): $img = storefront_product_image($product); $fallbackImg = storefront_product_fallback($product); $stock = storefront_effective_stock($product); ?>
                 <article class="product-card">
@@ -37,6 +54,7 @@ require __DIR__ . '/_header.php';
                 </article>
             <?php endforeach; else: ?><div class="empty-products full-span"><i class="bi bi-search"></i><h3>Produk tidak ditemukan</h3><p>Coba kata kunci atau kategori yang berbeda.</p><a class="btn-primary-store" href="<?= legacy_base_url('produk'); ?>">Lihat semua produk</a></div><?php endif; ?>
         </div>
+        <?= storefront_pagination($page, $totalPages, $pageQuery); ?>
     </section>
 </main>
 <?php require __DIR__ . '/_footer.php'; ?>
