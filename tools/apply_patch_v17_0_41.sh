@@ -25,7 +25,7 @@ chmod +x tools/expire_orders.php 2>/dev/null || true
 
 FAIL=0
 check() { if [ -f "$1" ] && grep -q -- "$2" "$1"; then echo "  [OK] $3"; else echo "  [!!] $3"; FAIL=1; fi; }
-check "legacy/app/Modules/Marketplace/Marketplace.php" "($isCod && function_exists('marketplace_store_pickup_deadline'))" "batas ambil hanya COD"
+check "legacy/app/Modules/Marketplace/Marketplace.php" 'pickup_deadline_at=COALESCE' "batas ambil hanya COD"
 check "legacy/app/Modules/Marketplace/StorePickup.php" "=== 'paid') return '';" "lunas tanpa batas ambil"
 check "legacy/public/store/order.php" '$pickupDeadlineLabel' "label batas ambil kondisional"
 check "legacy/public/admin/marketplace-orders/detail.php" '$pickupDeadlineLabel' "label batas ambil di admin"
