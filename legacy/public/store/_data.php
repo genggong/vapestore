@@ -21,9 +21,15 @@ function storefront_db(): ?PDO
 function storefront_table_exists(PDO $db, string $table): bool
 {
     try {
-        $stmt = $db->prepare("SHOW TABLES LIKE ?");
+        // V17.0.28 — "SHOW TABLES LIKE ?" tidak bisa di-prepare di MySQL (error 1064),
+        // sehingga helper ini dulu SELALU false dan filter brand/varian/voucher/pesanan
+        // diam-diam dilewati. Pakai information_schema yang aman.
+        $stmt = $db->prepare(
+            'SELECT COUNT(*) FROM information_schema.TABLES
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
+        );
         $stmt->execute([$table]);
-        return (bool) $stmt->fetchColumn();
+        return (int) $stmt->fetchColumn() > 0;
     } catch (Throwable $e) {
         return false;
     }
@@ -625,10 +631,29 @@ function storefront_stats(): array
     try { $stats['products'] = (int) $db->query("SELECT COUNT(*) FROM products WHERE is_active = 1")->fetchColumn(); } catch (Throwable $e) {}
     try { $stats['customers'] = (int) $db->query("SELECT COUNT(*) FROM customers")->fetchColumn(); } catch (Throwable $e) {}
     try { $stats['branches'] = (int) $db->query("SELECT COUNT(*) FROM branches WHERE is_active = 1")->fetchColumn(); } catch (Throwable $e) {}
+    // V17.0.28 — angka "Pesanan" diambil dari data nyata: pesanan web (bukan yang dibatalkan)
+    // ditambah transaksi kasir yang sukses. Pesanan web yang sudah dicatat ke POS
+    // (transactions.reference_type = 'online_order') tidak dihitung dua kali.
     try {
+        $stats['orders_online'] = 0;
+        $stats['orders_pos'] = 0;
         if (storefront_table_exists($db, 'online_orders')) {
-            $stats['orders'] = (int) $db->query("SELECT COUNT(*) FROM online_orders")->fetchColumn();
+            try {
+                $stats['orders_online'] = (int) $db->query(
+                    "SELECT COUNT(*) FROM online_orders WHERE COALESCE(order_status, '') <> 'cancelled'"
+                )->fetchColumn();
+            } catch (Throwable $e) {
+                $stats['orders_online'] = (int) $db->query("SELECT COUNT(*) FROM online_orders")->fetchColumn();
+            }
         }
+        try {
+            $stats['orders_pos'] = (int) $db->query(
+                "SELECT COUNT(*) FROM transactions
+                  WHERE status = 'success'
+                    AND (reference_type IS NULL OR reference_type <> 'online_order')"
+            )->fetchColumn();
+        } catch (Throwable $e) {}
+        $stats['orders'] = $stats['orders_online'] + $stats['orders_pos'];
     } catch (Throwable $e) {}
     return $stats;
 }

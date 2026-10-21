@@ -186,7 +186,7 @@ if ($promo) {
 
     <section class="store-container stats-strip reveal">
         <div><span><i class="bi bi-box-seam"></i></span><strong><?= number_format($stats['products'], 0, ',', '.'); ?>+</strong><small>Total Produk</small></div>
-        <div><span><i class="bi bi-bag-check"></i></span><strong><?= number_format($stats['orders'], 0, ',', '.'); ?>+</strong><small>Pesanan Online</small></div>
+        <div><span><i class="bi bi-bag-check"></i></span><strong><?= number_format($stats['orders'], 0, ',', '.'); ?>+</strong><small>Pesanan Selesai</small></div>
         <div><span><i class="bi bi-people"></i></span><strong><?= number_format($stats['customers'], 0, ',', '.'); ?>+</strong><small>Pelanggan Aktif</small></div>
         <div><span><i class="bi bi-shop"></i></span><strong><?= number_format($stats['branches'], 0, ',', '.'); ?></strong><small>Cabang Toko</small></div>
     </section>
