@@ -81,3 +81,14 @@ Lalu **Purge All**.
 - Hapus role uji → berhasil; hapus Owner → **ditolak**, owner tetap ada.
 - Halaman Atur Akses menampilkan grup **Marketplace & Kurir** dengan 2 item.
 - `tests/test_patch_v17_0_25.py` **14/14 OK**; regresi 17.0.16–17.0.24 hijau; `php -l` bersih (35 file paket).
+
+## Rollback berkas (kalau ada yang tidak sesuai)
+
+```bash
+cd ~/public_html
+bash backup_17.0.25_*/rollback.sh
+```
+
+Memulihkan berkas yang ditimpa (dari `.bak`). Berkas **baru** dari patch ini
+(`admin/roles/create.php`, `admin/roles/delete.php`) tidak dihapus otomatis — aman dibiarkan.
+Diuji lokal: apply → rollback → `VERSION` kembali **17.0.24**, `.env` & `uploads/` utuh.

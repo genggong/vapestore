@@ -34,6 +34,26 @@ while IFS= read -r f; do
 done < <(unzip -Z1 "${ZIP}")
 echo "    ${COUNT} berkas di paket"
 
+# Rollback siap pakai: "${b%.bak}" saja salah — path .bak masih di dalam folder backup,
+# jadi berkas kembali ke folder backup, bukan ke docroot (VERSION tetap versi baru).
+cat > "${BACKUP_DIR}/rollback.sh" <<'ROLLBACK'
+#!/usr/bin/env bash
+set -u
+cd "$(dirname "$0")" || exit 1
+BASE="$(pwd)"
+cd .. || exit 1
+N=0
+while IFS= read -r b; do
+  rel="${b#"$BASE"/}"
+  dest="${rel%.bak}"
+  if cp -p "$b" "$dest"; then echo "  pulih: $dest"; N=$((N+1)); fi
+done < <(find "$BASE" -name '*.bak')
+echo "Rollback selesai: $N berkas dipulihkan."
+echo "Berkas BARU dari patch (mis. admin/roles/create.php) tidak dihapus otomatis — aman dibiarkan."
+echo "Lanjutkan: Purge All, lalu tes /  dan /admin."
+ROLLBACK
+chmod +x "${BACKUP_DIR}/rollback.sh"
+
 echo "==> Timpa berkas..."
 unzip -o -q "${ZIP}"
 rm -f "${ZIP}"
@@ -55,7 +75,7 @@ check "VERSION" '17.0.25' "VERSION 17.0.25"
 if [ $FAIL -ne 0 ]; then
   echo
   echo "!! Ada marker yang tidak cocok. Berkas sudah ter-unzip, jadi rollback bila perlu:"
-  echo "   for b in \$(find ${BACKUP_DIR} -name '*.bak'); do cp -p \"\$b\" \"\${b%.bak}\"; done"
+  echo "   bash ${BACKUP_DIR}/rollback.sh"
   exit 1
 fi
 
@@ -68,5 +88,5 @@ echo "    1. Pembelian: simpan 1 produk/varian -> tidak ada lagi 'undefined func
 echo "    2. Role: /admin/roles/index.php -> Tambah Role (mis. Master Kurir) + tombol Hapus."
 echo "    3. Atur Akses role itu -> centang 'Laporan Ongkir Toko' -> login sebagai user role tsb."
 echo
-echo "==> Rollback berkas: for b in \$(find ${BACKUP_DIR} -name '*.bak'); do cp -p \"\$b\" \"\${b%.bak}\"; done"
+echo "==> Rollback berkas: bash ${BACKUP_DIR}/rollback.sh"
 echo "==> Folder backup: ${BACKUP_DIR}"
