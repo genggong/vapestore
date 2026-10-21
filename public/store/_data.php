@@ -302,6 +302,29 @@ function storefront_pagination(int $page, int $pages, array $query = [], string 
     return $html;
 }
 
+/**
+ * V17.0.30 — jumlah terjual (POS + pesanan online) untuk sort "Terlaris".
+ * Mengembalikan ekspresi SQL yang aman bila tabel penjualan belum ada.
+ */
+function storefront_sold_expr(PDO $db): string
+{
+    $parts = [];
+    try {
+        if (storefront_table_exists($db, 'transaction_items') && storefront_table_exists($db, 'transactions')) {
+            $parts[] = "(SELECT COALESCE(SUM(ti.qty),0) FROM transaction_items ti
+                          JOIN transactions t ON t.id = ti.transaction_id AND t.status = 'success'
+                         WHERE ti.product_id = p.id)";
+        }
+        if (storefront_table_exists($db, 'online_order_items') && storefront_table_exists($db, 'online_orders')) {
+            $parts[] = "(SELECT COALESCE(SUM(oi.qty),0) FROM online_order_items oi
+                          JOIN online_orders o ON o.id = oi.order_id
+                           AND o.order_status NOT IN ('cancelled','expired')
+                         WHERE oi.product_id = p.id)";
+        }
+    } catch (Throwable $e) {}
+    return $parts ? '(' . implode(' + ', $parts) . ')' : '0';
+}
+
 function storefront_products(array $options = []): array
 {
     $db = storefront_db();
@@ -351,12 +374,16 @@ function storefront_products(array $options = []): array
         }
     }
 
+    // V17.0.30 — semua urutan menaruh produk stok habis di paling bawah.
+    $outOfStockLast = 'CASE WHEN stock_total <= 0 THEN 1 ELSE 0 END ASC';
     switch ($sort) {
-        case 'price_asc': $order = 'p.selling_price ASC, p.id DESC'; break;
-        case 'price_desc': $order = 'p.selling_price DESC, p.id DESC'; break;
-        case 'name': $order = 'CASE WHEN stock_total <= 0 THEN 1 ELSE 0 END ASC, p.name ASC, p.id ASC'; break;
-        case 'stock': $order = 'stock_total DESC, p.id DESC'; break;
-        default: $order = 'p.id DESC';
+        case 'best': $order = $outOfStockLast . ', ' . storefront_sold_expr($db) . ' DESC, p.name ASC'; break;
+        case 'latest': $order = $outOfStockLast . ', p.id DESC'; break;
+        case 'price_asc': $order = $outOfStockLast . ', p.selling_price ASC, p.id DESC'; break;
+        case 'price_desc': $order = $outOfStockLast . ', p.selling_price DESC, p.id DESC'; break;
+        case 'name': $order = $outOfStockLast . ', p.name ASC, p.id ASC'; break;
+        case 'stock': $order = $outOfStockLast . ', stock_total DESC, p.id DESC'; break;
+        default: $order = $outOfStockLast . ', p.name ASC, p.id ASC';
     }
 
     try {

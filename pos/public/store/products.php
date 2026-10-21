@@ -39,7 +39,14 @@ require __DIR__ . '/_header.php';
             <div class="filter-search"><i class="bi bi-search"></i><input name="q" value="<?= e($q); ?>" placeholder="Cari nama produk, kode, kategori..."></div>
             <select name="category"><option value="">Semua Kategori</option><?php foreach ($categories as $cat): ?><option value="<?= e($cat['slug']); ?>" <?= $category === $cat['slug'] ? 'selected' : ''; ?>><?= e($cat['name']); ?></option><?php endforeach; ?></select>
             <select name="brand"><option value="0">Semua Brand</option><?php foreach($brands as $b):?><option value="<?=$b['id']?>" <?=$brand===(int)$b['id']?'selected':''?>><?=e($b['name'])?></option><?php endforeach;?></select>
-            <select name="sort"><option value="name" <?= $sort === 'name' ? 'selected' : ''; ?>>Nama A-Z • stok habis terakhir</option><option value="latest" <?= $sort === 'latest' ? 'selected' : ''; ?>>Terbaru</option><option value="price_asc" <?= $sort === 'price_asc' ? 'selected' : ''; ?>>Harga Terendah</option><option value="price_desc" <?= $sort === 'price_desc' ? 'selected' : ''; ?>>Harga Tertinggi</option><option value="stock" <?= $sort === 'stock' ? 'selected' : ''; ?>>Stok Terbanyak</option></select>
+            <select name="sort">
+                <option value="best" <?= $sort === 'best' ? 'selected' : ''; ?>>Terlaris</option>
+                <option value="name" <?= $sort === 'name' ? 'selected' : ''; ?>>Nama A-Z</option>
+                <option value="latest" <?= $sort === 'latest' ? 'selected' : ''; ?>>Terbaru</option>
+                <option value="price_asc" <?= $sort === 'price_asc' ? 'selected' : ''; ?>>Harga Terendah</option>
+                <option value="price_desc" <?= $sort === 'price_desc' ? 'selected' : ''; ?>>Harga Tertinggi</option>
+                <option value="stock" <?= $sort === 'stock' ? 'selected' : ''; ?>>Stok Terbanyak</option>
+            </select>
             <button type="submit" class="btn-primary-store"><i class="bi bi-funnel"></i> Terapkan</button>
             <?php if ($q !== '' || $category !== '' || $brand>0 || $sort !== 'latest'): ?><a class="btn-soft" href="<?= base_url('produk'); ?>"><i class="bi bi-arrow-counterclockwise"></i> Reset</a><?php endif; ?>
         </form>

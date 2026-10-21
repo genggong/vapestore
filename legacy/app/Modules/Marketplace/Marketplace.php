@@ -1146,6 +1146,214 @@ function marketplace_customer_can_review(PDO $db,int $customerId,int $productId)
     }
 }
 
+/**
+ * V17.0.30 — notifikasi WhatsApp pesanan marketplace ke nomor WA cabang pengirim.
+ * Antrean disimpan lebih dulu (cepat, tidak menahan checkout), pengiriman dilakukan
+ * setelah respons terkirim ke pembeli.
+ */
+function marketplace_order_notify_install(PDO $db): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS marketplace_order_notifications (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            order_id BIGINT NOT NULL,
+            branch_id BIGINT NOT NULL DEFAULT 0,
+            target VARCHAR(120) NOT NULL,
+            message MEDIUMTEXT NULL,
+            status ENUM('pending','sent','failed','skipped') NOT NULL DEFAULT 'pending',
+            attempts INT NOT NULL DEFAULT 0,
+            provider VARCHAR(40) NOT NULL DEFAULT 'fonnte',
+            response MEDIUMTEXT NULL,
+            last_error TEXT NULL,
+            sent_at DATETIME NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_mp_notif_status(status,created_at),
+            INDEX idx_mp_notif_order(order_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        if (marketplace_table_exists($db, 'settings')) {
+            foreach ([['marketplace_order_wa_enabled', '1'], ['marketplace_order_wa_target', '']] as $pair) {
+                $s = $db->prepare("INSERT IGNORE INTO settings(setting_key,setting_value) VALUES(?,?)");
+                $s->execute($pair);
+            }
+        }
+    } catch (Throwable $e) {}
+}
+
+/** Nomor tujuan: setting khusus, kalau kosong pakai nomor WA cabang pengirim. */
+function marketplace_order_notify_target(PDO $db, array $order): string
+{
+    $override = trim((string) setting('marketplace_order_wa_target', ''));
+    if ($override !== '') return $override;
+    $branchId = (int) ($order['branch_id'] ?? 0);
+    if ($branchId > 0) {
+        try {
+            $s = $db->prepare("SELECT phone FROM branches WHERE id=? LIMIT 1");
+            $s->execute([$branchId]);
+            $phone = trim((string) ($s->fetchColumn() ?: ''));
+            if ($phone !== '') return $phone;
+        } catch (Throwable $e) {}
+    }
+    if (function_exists('marketplace_wa_config')) {
+        try {
+            $admin = (string) (marketplace_wa_config()['admin_phone'] ?? '');
+            if ($admin !== '') return $admin;
+        } catch (Throwable $e) {}
+    }
+    return trim((string) setting('store_phone', ''));
+}
+
+function marketplace_order_notify_message(PDO $db, array $order): string
+{
+    $orderId = (int) ($order['id'] ?? 0);
+    $lines = [];
+    $lines[] = '*PESANAN ONLINE BARU*';
+    $lines[] = 'No: ' . (string) ($order['order_number'] ?? '-');
+    $branch = '';
+    try {
+        $s = $db->prepare("SELECT name FROM branches WHERE id=? LIMIT 1");
+        $s->execute([(int) ($order['branch_id'] ?? 0)]);
+        $branch = (string) ($s->fetchColumn() ?: '');
+    } catch (Throwable $e) {}
+    if ($branch !== '') $lines[] = 'Cabang: ' . $branch;
+    $lines[] = 'Penerima: ' . (string) ($order['recipient_name'] ?? '-') . ' (' . (string) ($order['recipient_phone'] ?? '-') . ')';
+    $address = trim(preg_replace('/\s+/', ' ', (string) ($order['address'] ?? '')));
+    if ($address !== '') $lines[] = 'Alamat: ' . (mb_substr($address, 0, 110));
+    $method = (string) ($order['courier_code'] ?? '');
+    $lines[] = 'Pengiriman: ' . ($method === 'pickup' ? 'Ambil di toko' : ($method === 'store' ? 'Kurir Toko' : strtoupper($method) . ' ' . (string) ($order['courier_service'] ?? '')));
+
+    $items = [];
+    try {
+        $s = $db->prepare("SELECT product_name,variant_name,qty,line_total FROM online_order_items WHERE order_id=? ORDER BY id ASC");
+        $s->execute([$orderId]);
+        $items = $s->fetchAll() ?: [];
+    } catch (Throwable $e) {}
+    if ($items) {
+        $lines[] = '';
+        $lines[] = 'Item:';
+        foreach ($items as $it) {
+            $nm = (string) $it['product_name'] . (!empty($it['variant_name']) ? ' - ' . $it['variant_name'] : '');
+            $lines[] = '- ' . $nm . ' x' . (int) $it['qty'] . ' = Rp ' . number_format((float) $it['line_total'], 0, ',', '.');
+        }
+    }
+    $lines[] = '';
+    $lines[] = 'Total: Rp ' . number_format((float) ($order['grand_total'] ?? 0), 0, ',', '.');
+    if ((float) ($order['shipping_cost'] ?? 0) > 0) {
+        $lines[] = 'Ongkir: Rp ' . number_format((float) $order['shipping_cost'], 0, ',', '.');
+    }
+    $pay = (string) ($order['payment_status'] ?? 'pending');
+    $lines[] = 'Pembayaran: ' . ($pay === 'paid' ? 'LUNAS' : strtoupper($pay) . ' (' . strtoupper((string) ($order['payment_method'] ?? '')) . ')');
+    $lines[] = 'Waktu: ' . date('d/m/Y H:i');
+    $lines[] = '';
+    $lines[] = 'Segera proses dari menu Marketplace > Pesanan.';
+    return implode("\n", $lines);
+}
+
+/** Simpan antrean notifikasi (idempoten per pesanan). */
+function marketplace_order_notify_queue(PDO $db, int $orderId): bool
+{
+    if ($orderId <= 0) return false;
+    if (trim((string) setting('marketplace_order_wa_enabled', '1')) === '0') return false;
+    // Jangan jalankan DDL bila tabel sudah ada: pemanggil bisa sedang di dalam transaksi.
+    if (!marketplace_table_exists($db, 'marketplace_order_notifications')) marketplace_order_notify_install($db);
+    try {
+        $dup = $db->prepare("SELECT id FROM marketplace_order_notifications WHERE order_id=? LIMIT 1");
+        $dup->execute([$orderId]);
+        if ((int) $dup->fetchColumn() > 0) return false;
+
+        $s = $db->prepare("SELECT * FROM online_orders WHERE id=? LIMIT 1");
+        $s->execute([$orderId]);
+        $order = $s->fetch();
+        if (!$order) return false;
+
+        $target = marketplace_order_notify_target($db, $order);
+        if ($target === '') {
+            $db->prepare("INSERT INTO marketplace_order_notifications(order_id,branch_id,target,status,last_error,created_at)
+                          VALUES(?,?,?,'skipped','Nomor WhatsApp cabang belum diisi.',NOW())")
+               ->execute([$orderId, (int) $order['branch_id'], '-']);
+            return false;
+        }
+        $db->prepare("INSERT INTO marketplace_order_notifications(order_id,branch_id,target,message,status,created_at)
+                      VALUES(?,?,?,?,'pending',NOW())")
+           ->execute([$orderId, (int) $order['branch_id'], $target, marketplace_order_notify_message($db, $order)]);
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/** Kirim satu pesan WA memakai helper Fonnte yang sudah ada di modul WhatsApp. */
+function marketplace_order_send_wa(PDO $db, string $target, string $message, int $orderId = 0): array
+{
+    // 1) Gateway WhatsApp Marketplace (Teknorilis) — dipakai lebih dulu bila sudah aktif.
+    if (!function_exists('marketplace_wa_config')) {
+        $gw = __DIR__ . '/WaGateway.php';
+        if (is_file($gw)) { try { require_once $gw; } catch (Throwable $e) {} }
+    }
+    if (function_exists('marketplace_wa_config')) {
+        try {
+            $cfg = marketplace_wa_config();
+            if (!empty($cfg['enabled']) && (int) $cfg['device_id'] > 0 && (string) $cfg['api_token'] !== '') {
+                $res = marketplace_wa_send_text($target, $message, 'mp-order-' . $orderId . '-' . md5($message));
+                return ['status' => 'sent', 'response' => json_encode($res, JSON_UNESCAPED_UNICODE)];
+            }
+        } catch (Throwable $e) {
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+    }
+
+    // 2) Fallback: WhatsApp POS (Fonnte).
+    if (!function_exists('wa_send_fonnte')) {
+        foreach ([dirname(__FILE__, 4) . '/public/admin/whatsapp/_helpers.php',
+                  dirname(__FILE__, 3) . '/public/admin/whatsapp/_helpers.php'] as $file) {
+            if (is_file($file)) { require_once $file; break; }
+        }
+    }
+    if (!function_exists('wa_send_fonnte')) {
+        return ['status' => 'skipped', 'error' => 'Belum ada gateway WhatsApp aktif (Marketplace/Teknorilis maupun Fonnte).'];
+    }
+    try {
+        $res = wa_send_fonnte($db, $target, $message, null);
+        return ['status' => 'sent', 'response' => json_encode($res, JSON_UNESCAPED_UNICODE)];
+    } catch (Throwable $e) {
+        return ['status' => 'failed', 'error' => $e->getMessage()];
+    }
+}
+
+/** Kirim antrean yang masih pending/failed. Dipakai shutdown hook & cron tool. */
+function marketplace_order_notify_dispatch(PDO $db, int $limit = 10, bool $retryFailed = false): array
+{
+    marketplace_order_notify_install($db);
+    $stats = ['sent' => 0, 'failed' => 0, 'skipped' => 0];
+    $limit = max(1, min(50, $limit));
+    try {
+        $statuses = $retryFailed ? "'pending','failed'" : "'pending'";
+        $rows = $db->query("SELECT * FROM marketplace_order_notifications WHERE status IN ($statuses) AND attempts < 5 ORDER BY id ASC LIMIT $limit")->fetchAll() ?: [];
+    } catch (Throwable $e) {
+        return $stats;
+    }
+    foreach ($rows as $row) {
+        $result = marketplace_order_send_wa($db, (string) $row['target'], (string) $row['message'], (int) $row['order_id']);
+        $status = (string) $result['status'];
+        $stats[$status] = ($stats[$status] ?? 0) + 1;
+        try {
+            $up = $db->prepare("UPDATE marketplace_order_notifications
+                                   SET status=?, attempts=attempts+1, response=?, last_error=?, sent_at=?
+                                 WHERE id=?");
+            $up->execute([
+                $status,
+                $result['response'] ?? null,
+                $result['error'] ?? null,
+                $status === 'sent' ? date('Y-m-d H:i:s') : null,
+                (int) $row['id'],
+            ]);
+        } catch (Throwable $e) {}
+    }
+    return $stats;
+}
+
 function marketplace_create_order(PDO $db, array $payload): array
 {
     marketplace_install($db);
@@ -1365,6 +1573,19 @@ function marketplace_create_order(PDO $db, array $payload): array
         $db->prepare("UPDATE online_orders SET payment_status='error',updated_at=NOW() WHERE order_number=?")->execute([$orderNumber]);
         marketplace_add_event($db, $orderId, 'payment_error', 'Pembayaran belum berhasil dibuat', $e->getMessage());
     }
+
+    // V17.0.30 — antre notifikasi WA cabang, lalu kirim setelah respons selesai (tidak menahan checkout).
+    try {
+        if (marketplace_order_notify_queue($db, (int) $orderId)) {
+            register_shutdown_function(static function () use ($db) {
+                try {
+                    if (function_exists('fastcgi_finish_request')) { @fastcgi_finish_request(); }
+                    elseif (function_exists('litespeed_finish_request')) { @litespeed_finish_request(); }
+                } catch (Throwable $e) {}
+                try { marketplace_order_notify_dispatch($db, 5); } catch (Throwable $e) {}
+            });
+        }
+    } catch (Throwable $e) {}
 
     return ['order_number' => $orderNumber, 'public_token' => $publicToken, 'existing' => false];
 }
