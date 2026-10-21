@@ -1288,6 +1288,10 @@ function marketplace_order_notify_message(PDO $db, array $order): string
         $lines[] = 'Pembayaran: ' . strtoupper($pay) . ' (' . $methodLabel . ')';
     }
     $lines[] = 'Waktu: ' . date('d/m/Y H:i');
+    if (strtolower((string) ($order['courier_code'] ?? '')) === 'pickup' && !empty($order['pickup_deadline_at'])) {
+        $dl = strtotime((string) $order['pickup_deadline_at']);
+        if ($dl) $lines[] = 'Batas ambil: ' . date('d/m/Y H:i', $dl);
+    }
     $lines[] = '';
     $lines[] = 'Segera proses dari menu Marketplace > Pesanan.';
     return implode("\n", $lines);
@@ -1566,7 +1570,9 @@ function marketplace_create_order(PDO $db, array $payload): array
         }
         if ($requestedCourier === 'pickup') {
             $pickupCode = marketplace_store_pickup_generate_code();
-            $db->prepare("UPDATE online_orders SET pickup_code=?,delivery_status='Menunggu diproses untuk pengambilan di toko' WHERE id=?")->execute([$pickupCode,$orderId]);
+            // V17.0.35 — batas ambil default hari ini (jam tutup toko).
+            $pickupDeadline = function_exists('marketplace_store_pickup_deadline') ? marketplace_store_pickup_deadline() : null;
+            $db->prepare("UPDATE online_orders SET pickup_code=?,pickup_deadline_at=COALESCE(?,pickup_deadline_at),delivery_status='Menunggu diproses untuk pengambilan di toko' WHERE id=?")->execute([$pickupCode,$pickupDeadline,$orderId]);
         }
 
         $parentCheck = $db->prepare("SELECT id FROM online_orders WHERE id=? AND order_number=? LIMIT 1");

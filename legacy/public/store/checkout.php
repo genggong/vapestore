@@ -106,6 +106,7 @@ require __DIR__ . '/_header.php';
                     <div class="span-2 checkout-pickup-fields" id="pickupStoreFields" hidden>
                         <div class="checkout-region-head"><div><b><i class="bi bi-shop-window"></i> Pilih Toko Pengambilan</b><small>Hanya toko dengan stok lengkap untuk seluruh keranjang yang dapat dipilih.</small></div><span id="pickupLoading" hidden><i class="bi bi-arrow-repeat"></i> Memuat</span></div>
                         <div class="pickup-store-options" id="pickupStoreOptions"></div>
+                        <?php if (function_exists('marketplace_store_pickup_deadline')): ?><div class="checkout-region-help" style="margin-bottom:6px"><i class="bi bi-clock-history"></i><span>Ambil <b>maksimal hari ini</b> sebelum <b><?= e(substr(marketplace_store_pickup_close_time(), 0, 5)); ?></b>.</span></div><?php endif; ?>
                         <div class="checkout-region-help" id="pickupStatus"><i class="bi bi-info-circle"></i><span>Pilih toko tempat pesanan akan diambil.</span></div>
                     </div>
                     <label class="span-2">Catatan Pesanan <small>(opsional)</small><textarea name="customer_note" rows="2" maxlength="500" placeholder="Contoh: bungkus aman, nama pengambil berbeda, dll."></textarea></label>

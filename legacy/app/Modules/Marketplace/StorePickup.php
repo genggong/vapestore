@@ -8,6 +8,54 @@
  * - A 6 digit pickup code is used when handing the package to the customer.
  */
 
+/** V17.0.35 — batas pengambilan: default hari yang sama (jam tutup toko). */
+function marketplace_store_pickup_max_days(): int
+{
+    $d = (int) setting('marketplace_store_pickup_max_days', '0');
+    return max(0, min(14, $d));
+}
+
+function marketplace_store_pickup_close_time(): string
+{
+    $hours = trim((string) setting('marketplace_store_pickup_hours', '09:00 - 21:00'));
+    if (preg_match('/(\d{1,2})[:.](\d{2})\s*(?:WIB)?\s*$/i', $hours, $m)) {
+        $h = max(0, min(23, (int) $m[1]));
+        return str_pad((string) $h, 2, '0', STR_PAD_LEFT) . ':' . $m[2] . ':00';
+    }
+    return '21:00:00';
+}
+
+function marketplace_store_pickup_deadline(?string $createdAt = null): string
+{
+    $base = $createdAt ? strtotime($createdAt) : time();
+    if (!$base) $base = time();
+    $day = date('Y-m-d', $base + (marketplace_store_pickup_max_days() * 86400));
+    $deadline = $day . ' ' . marketplace_store_pickup_close_time();
+    // Kalau pesanan dibuat setelah jam tutup, batas tetap hari itu (23:59) supaya tidak "mundur".
+    if (strtotime($deadline) <= $base) $deadline = $day . ' 23:59:00';
+    return $deadline;
+}
+
+function marketplace_store_pickup_deadline_passed(array $order): bool
+{
+    $deadline = trim((string) ($order['pickup_deadline_at'] ?? ''));
+    if ($deadline === '' || in_array((string) ($order['order_status'] ?? ''), ['completed', 'cancelled', 'expired'], true)) return false;
+    $ts = strtotime($deadline);
+    return $ts !== false && time() > $ts;
+}
+
+function marketplace_store_pickup_deadline_label(array $order): string
+{
+    $deadline = trim((string) ($order['pickup_deadline_at'] ?? ''));
+    if ($deadline === '') return '';
+    $ts = strtotime($deadline);
+    if ($ts === false) return '';
+    $label = date('d M Y H:i', $ts);
+    if (date('Y-m-d', $ts) === date('Y-m-d')) $label = 'Hari ini, maks ' . date('H:i', $ts);
+    if (marketplace_store_pickup_deadline_passed($order)) return 'Lewat batas (' . $label . ')';
+    return $label;
+}
+
 function marketplace_store_pickup_install(PDO $db): void
 {
     static $done = false;
@@ -20,6 +68,7 @@ function marketplace_store_pickup_install(PDO $db): void
         'picked_up_at' => "DATETIME NULL",
         'pickup_recipient' => "VARCHAR(160) NULL",
         'pickup_note' => "TEXT NULL",
+        'pickup_deadline_at' => "DATETIME NULL",
     ];
     foreach ($columns as $column => $definition) {
         try {
@@ -35,6 +84,7 @@ function marketplace_store_pickup_install(PDO $db): void
         'marketplace_store_pickup_hours' => '09:00 - 21:00 WIB',
         'marketplace_store_pickup_instructions' => 'Tunjukkan kode pengambilan kepada petugas toko saat mengambil pesanan.',
         'marketplace_store_pickup_branch_ids' => '',
+        'marketplace_store_pickup_max_days' => '0',
     ];
     foreach ($defaults as $key => $value) {
         try {

@@ -64,6 +64,7 @@ if(is_post()){
         $_POST['marketplace_store_courier_enabled']=(($_POST['marketplace_store_courier_enabled']??'off')==='on')?'on':'off';
         $_POST['marketplace_store_pickup_enabled']=(($_POST['marketplace_store_pickup_enabled']??'off')==='on')?'on':'off';
         $_POST['marketplace_cod_enabled']=(($_POST['marketplace_cod_enabled']??'on')==='on')?'on':'off';
+        $_POST['marketplace_store_pickup_max_days']=(string)max(0,min(14,(int)($_POST['marketplace_store_pickup_max_days']??0)));
         $pickupBranchIds=[];foreach((array)($_POST['marketplace_store_pickup_branch_ids']??[]) as $bid){$bid=(int)$bid;if($bid>0)$pickupBranchIds[$bid]=$bid;} $pickupBranchIds=array_values($pickupBranchIds);
         $_POST['marketplace_store_courier_fee']=(string)max(0,min(10000000,(int)($_POST['marketplace_store_courier_fee']??0)));
         $storeCoverage=strtolower(trim((string)($_POST['marketplace_store_courier_coverage']??'same_city')));
@@ -96,6 +97,7 @@ if(is_post()){
         mp_setting_save($db,'marketplace_store_courier_enabled',$_POST['marketplace_store_courier_enabled']);
         mp_setting_save($db,'marketplace_store_pickup_enabled',$_POST['marketplace_store_pickup_enabled']);
         mp_setting_save($db,'marketplace_cod_enabled',$_POST['marketplace_cod_enabled']);
+        mp_setting_save($db,'marketplace_store_pickup_max_days',$_POST['marketplace_store_pickup_max_days']);
         mp_setting_save($db,'marketplace_store_pickup_branch_ids',implode(',',array_map('intval',$pickupBranchIds)));
         foreach(array_keys(marketplace_wa_event_options()) as $evt){ $k='marketplace_wa_notify_'.$evt; mp_setting_save($db,$k,$_POST[$k]); }
         mp_setting_save($db,'rajaongkir_couriers',implode(':',$enabledCouriers));
@@ -223,6 +225,7 @@ require_once __DIR__.'/../../layouts/admin-header.php';require_once __DIR__.'/..
 <div class="system-field"><label>Nama Layanan</label><input name="marketplace_store_courier_name" maxlength="80" value="<?= e($v('marketplace_store_courier_name','Kurir Toko')); ?>" placeholder="Kurir Toko"></div>
 <div class="system-field"><label>Model Tarif</label><select name="marketplace_store_courier_rate_mode"><option value="flat" <?= $v('marketplace_store_courier_rate_mode','flat')==='flat'?'selected':''; ?>>Ongkir Flat</option><option value="subdistrict" <?= $v('marketplace_store_courier_rate_mode','flat')==='subdistrict'?'selected':''; ?>>Ongkir per Kelurahan/Desa</option></select><small>Mode per Kelurahan hanya menampilkan Kurir Toko jika tujuan sudah mempunyai tarif aktif.</small></div>
 <div class="system-field"><label>Ongkir Flat</label><input type="number" name="marketplace_store_courier_fee" min="0" max="10000000" step="1000" value="<?= e($v('marketplace_store_courier_fee','10000')); ?>"><small>Dipakai hanya jika Model Tarif = Ongkir Flat.</small></div>
+<div class="system-field"><label>Batas Pengambilan</label><select name="marketplace_store_pickup_max_days"><option value="0" <?= $v('marketplace_store_pickup_max_days','0')==='0'?'selected':''; ?>>Hari ini (maks jam tutup)</option><option value="1" <?= $v('marketplace_store_pickup_max_days','0')==='1'?'selected':''; ?>>1 hari</option><option value="2" <?= $v('marketplace_store_pickup_max_days','0')==='2'?'selected':''; ?>>2 hari</option><option value="3" <?= $v('marketplace_store_pickup_max_days','0')==='3'?'selected':''; ?>>3 hari</option></select><small>Pesanan Ambil di Toko wajib diambil sebelum batas ini; pesanan lewat batas ditandai merah di pesanan &amp; detail admin.</small></div>
 <div class="system-field"><label>Bayar di Tempat (COD)</label><select name="marketplace_cod_enabled"><option value="on" <?= $v('marketplace_cod_enabled','on')==='on'?'selected':''; ?>>Aktif</option><option value="off" <?= $v('marketplace_cod_enabled','off')==='off'?'selected':''; ?>>Nonaktif</option></select><small>Pelanggan bisa bayar tunai untuk <b>Ambil di Toko</b> dan <b>Kurir Toko</b>. Ekspedisi tetap QRIS/VA.</small></div>
 <div class="system-field"><label>Estimasi Default</label><input name="marketplace_store_courier_eta" maxlength="80" value="<?= e($v('marketplace_store_courier_eta','1-3 jam')); ?>" placeholder="1-3 jam"></div>
 <div class="system-field"><label>Tarif per Kelurahan</label><a class="btn-soft" href="<?= e(base_url('admin/marketplace-courier-rates/index.php')); ?>"><i class="bi bi-geo-alt-fill"></i> Atur Tarif Kelurahan</a><small>Setiap Kelurahan/Desa bisa memiliki ongkir dan estimasi sendiri.</small></div>
