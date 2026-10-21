@@ -1287,24 +1287,7 @@ function marketplace_order_notify_queue(PDO $db, int $orderId): bool
 /** Kirim satu pesan WA memakai helper Fonnte yang sudah ada di modul WhatsApp. */
 function marketplace_order_send_wa(PDO $db, string $target, string $message, int $orderId = 0): array
 {
-    // 1) Gateway WhatsApp Marketplace (Teknorilis) — dipakai lebih dulu bila sudah aktif.
-    if (!function_exists('marketplace_wa_config')) {
-        $gw = __DIR__ . '/WaGateway.php';
-        if (is_file($gw)) { try { require_once $gw; } catch (Throwable $e) {} }
-    }
-    if (function_exists('marketplace_wa_config')) {
-        try {
-            $cfg = marketplace_wa_config();
-            if (!empty($cfg['enabled']) && (int) $cfg['device_id'] > 0 && (string) $cfg['api_token'] !== '') {
-                $res = marketplace_wa_send_text($target, $message, 'mp-order-' . $orderId . '-' . md5($message));
-                return ['status' => 'sent', 'response' => json_encode($res, JSON_UNESCAPED_UNICODE)];
-            }
-        } catch (Throwable $e) {
-            return ['status' => 'failed', 'error' => $e->getMessage()];
-        }
-    }
-
-    // 2) Fallback: WhatsApp POS (Fonnte).
+    // V17.0.31 — notifikasi pesanan memakai Fonnte (WhatsApp POS) saja, bukan gateway marketplace.
     if (!function_exists('wa_send_fonnte')) {
         foreach ([dirname(__FILE__, 4) . '/public/admin/whatsapp/_helpers.php',
                   dirname(__FILE__, 3) . '/public/admin/whatsapp/_helpers.php'] as $file) {
@@ -1312,7 +1295,7 @@ function marketplace_order_send_wa(PDO $db, string $target, string $message, int
         }
     }
     if (!function_exists('wa_send_fonnte')) {
-        return ['status' => 'skipped', 'error' => 'Belum ada gateway WhatsApp aktif (Marketplace/Teknorilis maupun Fonnte).'];
+        return ['status' => 'skipped', 'error' => 'Modul WhatsApp POS (Fonnte) tidak ditemukan di server.'];
     }
     try {
         $res = wa_send_fonnte($db, $target, $message, null);

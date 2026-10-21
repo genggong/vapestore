@@ -64,6 +64,7 @@ body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#fff7f7;color:va
     <?php foreach($items as $it): ?>
         <div class="item">
             <span class="item-name"><?= e($it['product_name']); ?></span>
+            <?php if(!empty($it['variant_name'])): ?><span class="muted">Varian: <?= e($it['variant_name']); ?></span><?php endif; ?>
             <?php if(!empty($it['price_level'])): ?><span class="muted">Level: <?= e($it['price_level']); ?></span><?php endif; ?>
             <div class="item-meta"><span><?= e($it['qty']); ?> x <?= rupiah($it['unit_price']); ?></span><b><?= rupiah($it['subtotal']); ?></b></div>
         </div>

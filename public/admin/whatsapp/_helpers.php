@@ -109,7 +109,9 @@ function wa_invoice_message(array $trx, array $items): string
 
     foreach ($items as $it) {
         $qty = (int) ($it['qty'] ?? 0);
-        $name = $it['product_name'] ?? '-';
+        $name = (string) ($it['product_name'] ?? '-');
+        // V17.0.31 — invoice WA customer ikut menampilkan varian yang dibeli.
+        if (!empty($it['variant_name'])) $name .= ' - ' . $it['variant_name'];
         $price = (float) ($it['unit_price'] ?? 0);
         $sub = (float) ($it['subtotal'] ?? ($qty * $price));
         $lines[] = '- ' . $name . ' x' . $qty . ' @ ' . rupiah($price) . ' = ' . rupiah($sub);
