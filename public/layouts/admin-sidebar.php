@@ -89,6 +89,7 @@ menu_link('categories.view', 'admin/categories/index.php', 'bi-tags-fill', 'Kate
             menu_link('settings.view', 'admin/marketplace-courier-rates/index.php', 'bi-geo-alt-fill', 'Tarif Kurir Toko', $currentPath);
                         menu_link('stock.view', 'admin/locations/index.php', 'bi-geo-alt-fill', 'Rak / Lokasi', $currentPath);
 menu_link('stock.view', 'admin/stock-opname/index.php', 'bi-clipboard-check-fill', 'Stock Opname', $currentPath);
+            menu_link('stock.view', 'admin/stock-opname-gudang/index.php', 'bi-box-seam-fill', 'Opname Gudang', $currentPath);
             menu_link('warehouse_checks.view', 'admin/warehouse-checks/index.php', 'bi-clipboard2-check-fill', 'Cek Gudang / QC', $currentPath);
             menu_link('import_products.view', 'admin/import-products/index.php', 'bi-file-earmark-spreadsheet', 'Import Produk', $currentPath);
             ?>

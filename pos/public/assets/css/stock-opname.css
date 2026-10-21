@@ -24,3 +24,20 @@
 @media (max-width: 720px) {
     .opname-table .opname-name-cell { min-width: 280px !important; max-width: 400px !important; }
 }
+
+/* V17.0.43 — Stok Opname Gudang */
+.opname-form{display:grid;gap:14px;padding:4px 2px}
+.opname-field{display:grid;gap:6px}
+.opname-field>label{font-size:13px;font-weight:600;color:#334155}
+.opname-field input[type=text],.opname-field input[type=file],.opname-field textarea{border:1px solid #d7dbe0;border-radius:12px;padding:10px 12px;font-size:14px;background:#fff;width:100%}
+.opname-check{display:flex;align-items:center;gap:8px;font-weight:500;font-size:13px;color:#475569}
+.opname-check input{width:16px;height:16px}
+.opname-search{border:1px solid #d7dbe0;border-radius:12px;padding:9px 12px;font-size:13px;min-width:240px;background:#fff}
+.opname-input{border:1px solid #d7dbe0;border-radius:10px;padding:7px 9px;font-size:13px;width:88px;text-align:right;background:#fff}
+.opname-input.note{width:180px;text-align:left}
+.opname-input:focus,.opname-search:focus{outline:2px solid rgba(17,17,17,.15);border-color:#111}
+.opname-chip{display:inline-block;min-width:38px;text-align:center;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:600;background:#f1f5f9;color:#475569}
+.opname-chip.plus{background:#dcfce7;color:#166534}
+.opname-chip.minus{background:#fee2e2;color:#991b1b}
+.opname-chip.same{background:#e2e8f0;color:#334155}
+.opname-row-actions{white-space:nowrap}
