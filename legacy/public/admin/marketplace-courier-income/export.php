@@ -2,7 +2,7 @@
 require_once __DIR__.'/../../../app/bootstrap.php';
 require_once __DIR__.'/../../../app/Modules/Marketplace/Marketplace.php';
 require_once __DIR__.'/../../../app/Modules/DataExchange/Xlsx.php';
-Auth::requireRole(['super_admin','owner']);
+Auth::requirePermissionOrRole(['super_admin','owner'], 'courier_income.export');
 $db=Database::connect();marketplace_install($db);
 $from=preg_match('/^\d{4}-\d{2}-\d{2}$/',(string)($_GET['from']??''))?$_GET['from']:date('Y-m-01');$to=preg_match('/^\d{4}-\d{2}-\d{2}$/',(string)($_GET['to']??''))?$_GET['to']:date('Y-m-d');$subdistrict=trim((string)($_GET['subdistrict']??''));$courierId=max(0,(int)($_GET['courier_id']??0));
 $where=["o.courier_code='store'","o.payment_status='paid'","DATE(COALESCE(o.paid_at,o.created_at)) BETWEEN ? AND ?"];$params=[$from,$to];if($subdistrict!==''){$where[]='o.subdistrict=?';$params[]=$subdistrict;}if($courierId>0){$where[]='a.courier_id=?';$params[]=$courierId;}

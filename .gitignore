@@ -28,3 +28,7 @@ writable/uploads/*
 # Python
 __pycache__/
 *.pyc
+
+# harness uji lokal — jangan pernah dikirim
+_local_admin.php
+_harness_role.php

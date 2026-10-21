@@ -47,6 +47,14 @@ function permission_groups(): array
                 'backup.manage' => ['Kelola Backup', 'Buat, download, hapus backup'],
             ],
         ],
+        'Marketplace & Kurir' => [
+            'icon' => 'bi-bicycle',
+            'description' => 'Akses laporan dan pengaturan kurir toko (ongkir).',
+            'items' => [
+                'courier_income.view' => ['Laporan Ongkir Toko', 'Melihat laporan ongkir kurir toko'],
+                'courier_income.export' => ['Export Laporan Ongkir', 'Mengunduh laporan ongkir (CSV)'],
+            ],
+        ],
         'Sistem' => [
             'icon' => 'bi-gear',
             'description' => 'Akses sistem, user, role, log, dan pengaturan.',
@@ -110,6 +118,8 @@ function seed_default_role_permissions(PDO $db): void
 
     $count = (int) $db->query("SELECT COUNT(*) FROM role_permissions")->fetchColumn();
     if ($count > 0) {
+        // V17.0.25: permission baru tetap masuk ke Super Admin & Owner walau tabel sudah terisi.
+        owner_permission_topup($db);
         return;
     }
 
@@ -150,6 +160,34 @@ function seed_default_role_permissions(PDO $db): void
         foreach ($permissions as $permission) {
             $insert->execute([$roleId, $permission]);
         }
+    }
+
+    owner_permission_topup($db);
+}
+
+/**
+ * V17.0.25: hak akses baru otomatis ikut untuk Super Admin & Owner.
+ * Dulu seed berhenti bila tabel sudah terisi, sehingga permission BARU tidak pernah masuk
+ * dan halaman yang tadinya owner-only jadi tidak bisa dibuka role mana pun.
+ */
+function owner_permission_topup(PDO $db): void
+{
+    try {
+        $all = all_permission_keys();
+        $roles = $db->query("SELECT id, slug FROM roles WHERE slug IN ('super_admin','owner')")->fetchAll() ?: [];
+        if (!$roles) return;
+        $ins = $db->prepare("INSERT IGNORE INTO role_permissions (role_id, permission_key, is_allowed) VALUES (?, ?, 1)");
+        foreach ($roles as $role) {
+            foreach ($all as $key) {
+                if ($role['slug'] === 'owner' && $key === 'roles.manage') continue;
+                $ins->execute([(int)$role['id'], $key]);
+            }
+        }
+        if (class_exists('Auth') && in_array(Auth::role(), ['super_admin', 'owner'], true)) {
+            Auth::refreshPermissions();
+        }
+    } catch (Throwable $e) {
+        error_log('[roles][topup] ' . $e->getMessage());
     }
 }
 

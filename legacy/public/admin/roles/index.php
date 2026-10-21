@@ -61,6 +61,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
                 <h3>Daftar Role</h3>
                 <p>Pilih role lalu atur checklist akses menu yang diperbolehkan.</p>
             </div>
+            <a class="roles-btn primary" href="<?= legacy_base_url('admin/roles/create.php'); ?>"><i class="bi bi-plus-circle"></i> Tambah Role</a>
         </div>
 
         <div class="roles-table-wrap">
@@ -95,6 +96,13 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
                                 <a class="roles-btn primary" href="<?= legacy_base_url('admin/roles/permissions.php?id=' . $role['id']); ?>">
                                     <i class="bi bi-sliders"></i> Atur Akses
                                 </a>
+                                <?php if (!in_array($role['slug'], ['super_admin', 'owner'], true)): ?>
+                                    <form method="POST" action="<?= legacy_base_url('admin/roles/delete.php'); ?>" onsubmit="return confirm('Hapus role <?= e($role['name']); ?>?');" style="display:inline">
+                                        <?= CSRF::input(); ?>
+                                        <input type="hidden" name="id" value="<?= (int)$role['id']; ?>">
+                                        <button class="roles-btn" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca"><i class="bi bi-trash"></i> Hapus</button>
+                                    </form>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>

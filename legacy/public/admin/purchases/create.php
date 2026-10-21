@@ -3,6 +3,18 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 require_once __DIR__ . '/../../../app/Modules/Marketplace/Marketplace.php';
 Auth::requireRole(['super_admin','owner']);
 require_once __DIR__ . '/_helpers.php';
+// V17.0.25: pengaman bila purchases/_helpers.php di server masih generasi lama
+// (gejala: "Gagal membuat pembelian: Call to undefined function avg_hpp()").
+if (!function_exists('avg_hpp')) {
+    function avg_hpp(float $oldStock, float $oldPrice, float $newQty, float $newPrice): float
+    {
+        if ($newQty <= 0) return $oldPrice;
+        $total = $oldStock + $newQty;
+        if ($oldStock <= 0 || $oldPrice <= 0) return $newPrice;
+        return round(($oldStock * $oldPrice + $newQty * $newPrice) / $total, 2);
+    }
+}
+
 require_once __DIR__ . '/../branches/_helpers.php';
 require_once __DIR__ . '/../warehouse/_helpers.php';
 require_once __DIR__ . '/../../../app/Modules/CatalogFast.php';

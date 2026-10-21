@@ -118,6 +118,11 @@ function legacy_base_url(string $path = ''): string
     return $path ? $baseUrl . '/' . $path : $baseUrl;
 }
 
+/** V17.0.25: alias — Auth legacy memanggil redirect(), root/pos tree punya fungsi ini. */
+if (!function_exists('redirect')) {
+    function redirect(string $path) { legacy_redirect($path); }
+}
+
 function legacy_redirect(string $path)
 {
     header('Location: ' . legacy_base_url($path));

@@ -172,6 +172,19 @@ class Auth
         return false;
     }
 
+    /** V17.0.25: izinkan role tertentu ATAU pemegang permission (untuk halaman yang dulu owner-only). */
+    public static function requirePermissionOrRole(array $roles, string $permission): void
+    {
+        self::requireLogin();
+
+        if (in_array(self::role(), $roles, true) || self::can($permission)) {
+            return;
+        }
+
+        flash('error', 'Kamu tidak punya hak akses ke halaman tersebut.');
+        redirect('admin/dashboard.php');
+    }
+
     public static function requirePermission(string $permission): void
     {
         self::requireLogin();
