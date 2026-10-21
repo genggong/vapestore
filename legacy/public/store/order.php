@@ -33,6 +33,15 @@ require __DIR__ . '/_header.php';
             </div>
         </section>
 
+        <?php if (strtolower((string) $order['payment_method']) === 'cod' && (string) $order['payment_status'] === 'unpaid'): ?>
+        <div class="store-container"><div class="cod-prepare-banner">
+            <i class="bi bi-cash-stack"></i>
+            <div>
+                <b>Siapkan uang tunai <?= rupiah((float) $order['grand_total']); ?></b>
+                <span>Bayar saat <?= strtolower((string) $order['courier_code']) === 'pickup' ? 'ambil di toko' : 'pesanan diterima kurir toko'; ?> — tidak perlu transfer.<?php if (!empty($order['pickup_code'])): ?> Kode pengambilan <b><?= e($order['pickup_code']); ?></b>.<?php endif; ?></span>
+            </div>
+        </div></div>
+        <?php endif; ?>
         <section class="store-container order-layout">
             <div class="order-main-column">
                 <section class="checkout-box payment-instruction-card">
@@ -120,6 +129,27 @@ require __DIR__ . '/_header.php';
                     <?php endforeach; ?>
                 </div>
                 <div class="summary-lines"><div><span>Subtotal</span><b><?= rupiah((float) $order['subtotal']); ?></b></div><?php if ((float)($order['discount'] ?? 0) > 0): ?><div><span>Diskon<?= !empty($order['voucher_code']) ? ' • ' . e($order['voucher_code']) : ''; ?></span><b class="purple-text">- <?= rupiah((float)$order['discount']); ?></b></div><?php endif; ?><div><span>Ongkir</span><b><?= rupiah((float) $order['shipping_cost']); ?></b></div><?php if((float)($order['shipping_discount']??0)>0):?><div><span>Gratis Ongkir</span><b class="purple-text">- <?=rupiah((float)$order['shipping_discount'])?></b></div><?php endif;?><?php if((float)($order['points_discount']??0)>0):?><div><span>Poin (<?= (int)$order['points_redeemed']?>)</span><b class="purple-text">- <?=rupiah((float)$order['points_discount'])?></b></div><?php endif;?><div class="grand"><span>Total Pesanan</span><strong><?= rupiah((float) $order['grand_total']); ?></strong></div><?php if ((int)($order['points_earned'] ?? 0) > 0): ?><div><span>Poin Member</span><b>+ <?= (int)$order['points_earned']; ?> poin</b></div><?php endif; ?><?php if ((float) $order['payment_total'] > (float) $order['grand_total']): ?><div><span>Total Pembayaran</span><b><?= rupiah((float) $order['payment_total']); ?></b></div><?php endif; ?></div>
+                <?php
+                $cancelLeft = function_exists('marketplace_order_cancel_remaining') ? marketplace_order_cancel_remaining($order, $db) : 0;
+                $cancelWindow = function_exists('marketplace_cancel_window_minutes') ? marketplace_cancel_window_minutes() : 10;
+                ?>
+                <?php if ($cancelLeft > 0): ?>
+                <div class="cancel-window-box" data-cancel-seconds="<?= (int) $cancelLeft; ?>">
+                    <b>Bisa dibatalkan sendiri</b>
+                    <small>Sisa <span class="cancel-timer" data-cancel-timer><?= e(marketplace_order_cancel_label($order, $db)); ?></span> lagi — maksimal <?= (int) $cancelWindow; ?> menit sejak checkout.</small>
+                    <form method="post" action="<?= legacy_base_url('store/cancel-order.php'); ?>" onsubmit="return confirm('Batalkan pesanan ini? Stok akan dikembalikan otomatis.');">
+                        <?= CSRF::input(); ?>
+                        <input type="hidden" name="order" value="<?= e($order['order_number']); ?>">
+                        <input type="hidden" name="token" value="<?= e($order['public_token']); ?>">
+                        <button type="submit" data-cancel-button><i class="bi bi-x-circle"></i> Batalkan Pesanan</button>
+                    </form>
+                </div>
+                <?php elseif (!in_array((string) $order['order_status'], ['cancelled', 'expired', 'completed'], true) && (string) $order['payment_status'] !== 'paid'): ?>
+                <div class="cancel-window-box locked">
+                    <b>Pembatalan mandiri sudah ditutup</b>
+                    <small>Batas <?= (int) $cancelWindow; ?> menit sejak checkout sudah lewat. Hubungi toko lewat menu Bantuan Pesanan.</small>
+                </div>
+                <?php endif; ?>
                 <?php if ($storeCustomerId > 0 && (int)($order['customer_id'] ?? 0) === $storeCustomerId): ?>
                 <div style="display:grid;gap:8px;margin-top:12px">
                     <?php if ((string)$order['order_status'] === 'shipped'): ?><form method="post" action="<?= legacy_base_url('store/order-customer-action.php'); ?>"><?= CSRF::input(); ?><input type="hidden" name="order_id" value="<?= (int)$order['id']; ?>"><input type="hidden" name="action" value="confirm_received"><button class="btn-primary-store full" type="submit"><i class="bi bi-check2-circle"></i> Konfirmasi Barang Diterima</button></form><?php endif; ?>
@@ -136,6 +166,27 @@ require __DIR__ . '/_header.php';
         <div id="orderLiveConfig" data-order="<?= e($order['order_number']); ?>" data-token="<?= e($order['public_token']); ?>" data-status-url="<?= e(legacy_base_url('store/api/payment-status.php')); ?>" data-retry-url="<?= e(legacy_base_url('store/api/retry-payment.php')); ?>" data-csrf="<?= e(CSRF::token()); ?>"></div>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
         <script src="<?= legacy_base_url('assets/js/marketplace-order.js?v=15.2.0'); ?>"></script>
+        <script>
+        (function () {
+          var box = document.querySelector('[data-cancel-seconds]');
+          if (!box) return;
+          var left = parseInt(box.dataset.cancelSeconds, 10) || 0;
+          var timer = box.querySelector('[data-cancel-timer]');
+          var btn = box.querySelector('[data-cancel-button]');
+          function paint() {
+            if (left <= 0) {
+              if (timer) timer.textContent = '00:00';
+              if (btn) { btn.disabled = true; btn.textContent = 'Waktu pembatalan habis'; }
+              box.classList.add('locked');
+              return;
+            }
+            if (timer) timer.textContent = String(Math.floor(left / 60)).padStart(2, '0') + ':' + String(left % 60).padStart(2, '0');
+            left -= 1;
+            setTimeout(paint, 1000);
+          }
+          paint();
+        })();
+        </script>
     <?php endif; ?>
 </main>
 <?php require __DIR__ . '/_footer.php'; ?>

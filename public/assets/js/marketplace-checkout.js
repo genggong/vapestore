@@ -255,8 +255,12 @@
     function syncCodOption() {
       if (!codCard) return;
       const ok = codAllowedNow();
-      codCard.hidden = !ok;
+      // V17.0.37 — kartu COD selalu tampil di samping QRIS, hanya dinonaktifkan bila tidak berlaku.
+      codCard.hidden = false;
       codCard.classList.toggle('disabled', !ok);
+      codCard.setAttribute('aria-disabled', ok ? 'false' : 'true');
+      const hint = codCard.querySelector('[data-cod-hint]');
+      if (hint) hint.textContent = ok ? 'Bayar tunai saat ambil di toko / diterima kurir toko' : 'Khusus Ambil di Toko / Kurir Toko';
       const radio = $('input[name="payment_method"][value="cod"]', form);
       const selected = $('input[name="payment_method"]:checked', form);
       if (radio) radio.disabled = !ok;

@@ -964,6 +964,91 @@ function marketplace_order_events(PDO $db, int $orderId): array
     return $stmt->fetchAll() ?: [];
 }
 
+/**
+ * V17.0.37 — jendela pembatalan mandiri oleh pembeli (default 10 menit, semua metode bayar).
+ */
+function marketplace_cancel_window_minutes(): int
+{
+    $m = (int) setting('marketplace_cancel_window_minutes', '10');
+    return max(0, min(180, $m));
+}
+
+/** Sisa detik untuk membatalkan; 0 = tidak bisa dibatalkan sendiri. */
+function marketplace_order_cancel_remaining(array $order, ?PDO $db = null): int
+{
+    if (empty($order)) return 0;
+    $status = (string) ($order['order_status'] ?? '');
+    if (!in_array($status, ['pending_payment', 'pending', 'confirmed', 'processing'], true)) return 0;
+    if (!in_array((string) ($order['payment_status'] ?? ''), ['pending', 'unpaid', 'error'], true)) return 0;
+    // Umur dihitung dari MySQL supaya tidak terpengaruh beda timezone PHP vs DB.
+    $age = null;
+    if ($db instanceof PDO && !empty($order['id'])) {
+        try {
+            $st = $db->prepare('SELECT TIMESTAMPDIFF(SECOND, created_at, NOW()) FROM online_orders WHERE id=?');
+            $st->execute([(int) $order['id']]);
+            $age = (int) $st->fetchColumn();
+        } catch (Throwable $e) {
+            $age = null;
+        }
+    }
+    if ($age === null) {
+        $created = strtotime((string) ($order['created_at'] ?? ''));
+        if (!$created) return 0;
+        $age = time() - $created;
+    }
+    $left = (marketplace_cancel_window_minutes() * 60) - max(0, (int) $age);
+    return $left > 0 ? $left : 0;
+}
+
+function marketplace_order_cancel_label(array $order, ?PDO $db = null): string
+{
+    $left = marketplace_order_cancel_remaining($order, $db);
+    if ($left <= 0) return '';
+    return sprintf('%02d:%02d', intdiv($left, 60), $left % 60);
+}
+
+/**
+ * Batalkan pesanan atas permintaan pembeli (guest maupun member) dalam jendela waktu.
+ * @return array{ok:bool,message:string,order:?array}
+ */
+function marketplace_customer_cancel_order(PDO $db, string $orderNumber, string $token): array
+{
+    marketplace_install($db);
+    $stmt = $db->prepare("SELECT * FROM online_orders WHERE order_number=? AND public_token=? LIMIT 1");
+    $stmt->execute([$orderNumber, $token]);
+    $order = $stmt->fetch();
+    if (!$order) return ['ok' => false, 'message' => 'Pesanan tidak ditemukan.', 'order' => null];
+
+    if (marketplace_order_cancel_remaining($order, $db) <= 0) {
+        $menit = marketplace_cancel_window_minutes();
+        if ((string) ($order['payment_status'] ?? '') === 'paid') {
+            return ['ok' => false, 'message' => 'Pesanan sudah dibayar. Ajukan pembatalan lewat menu Bantuan Pesanan.', 'order' => $order];
+        }
+        return ['ok' => false, 'message' => "Batas pembatalan {$menit} menit sudah lewat. Hubungi toko lewat menu Bantuan Pesanan.", 'order' => $order];
+    }
+
+    $started = !$db->inTransaction();
+    if ($started) $db->beginTransaction();
+    try {
+        $up = $db->prepare("UPDATE online_orders SET order_status='cancelled', payment_status=CASE WHEN payment_status IN ('pending','unpaid','error') THEN 'cancelled' ELSE payment_status END, cancelled_at=COALESCE(cancelled_at,NOW()), updated_at=NOW() WHERE id=? AND order_status=?");
+        $up->execute([(int) $order['id'], (string) $order['order_status']]);
+        if ($up->rowCount() === 0) {
+            if ($started) $db->rollBack();
+            return ['ok' => false, 'message' => 'Pesanan sudah diproses dan tidak bisa dibatalkan.', 'order' => $order];
+        }
+        if ($started) $db->commit();
+    } catch (Throwable $e) {
+        if ($started && $db->inTransaction()) $db->rollBack();
+        throw $e;
+    }
+
+    if (function_exists('marketplace_release_stock')) {
+        marketplace_release_stock($db, (int) $order['id'], 'Dibatalkan pembeli dalam ' . marketplace_cancel_window_minutes() . ' menit.');
+    }
+    marketplace_add_event($db, (int) $order['id'], 'cancelled', 'Dibatalkan pembeli', 'Pembatalan mandiri dalam ' . marketplace_cancel_window_minutes() . ' menit setelah checkout.');
+    return ['ok' => true, 'message' => 'Pesanan dibatalkan. Stok sudah dikembalikan.', 'order' => $order];
+}
+
 function marketplace_release_stock(PDO $db, int $orderId, string $reason = 'Pesanan dibatalkan/expired'): bool
 {
     marketplace_install($db);

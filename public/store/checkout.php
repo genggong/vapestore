@@ -131,6 +131,14 @@ require __DIR__ . '/_header.php';
                         <span><b>QRIS</b><small>Scan QR, konfirmasi otomatis</small></span>
                         <i class="bi bi-check-circle-fill payment-check"></i>
                     </label>
+                    <?php if (!empty($codEnabled)): ?>
+                    <label class="payment-method-card payment-method-cod disabled" data-cod-card aria-disabled="true">
+                        <input type="radio" name="payment_method" value="cod" disabled>
+                        <span class="payment-icon"><i class="bi bi-cash-coin"></i></span>
+                        <span><b>Bayar di Tempat (COD)</b><small data-cod-hint>Khusus Ambil di Toko / Kurir Toko</small></span>
+                        <i class="bi bi-check-circle-fill payment-check"></i>
+                    </label>
+                    <?php endif; ?>
                     <label class="payment-method-card">
                         <input type="radio" name="payment_method" value="bri_va">
                         <span class="payment-icon"><i class="bi bi-bank"></i></span>
@@ -153,14 +161,6 @@ require __DIR__ . '/_header.php';
                         </select></span>
                         <i class="bi bi-check-circle-fill payment-check"></i>
                     </label>
-                    <?php if (!empty($codEnabled)): ?>
-                    <label class="payment-method-card payment-method-cod" data-cod-card hidden>
-                        <input type="radio" name="payment_method" value="cod" disabled>
-                        <span class="payment-icon"><i class="bi bi-cash-coin"></i></span>
-                        <span><b>Bayar di Tempat (COD)</b><small>Bayar tunai saat ambil di toko / pesanan diterima kurir toko</small></span>
-                        <i class="bi bi-check-circle-fill payment-check"></i>
-                    </label>
-                    <?php endif; ?>
                 </div>
                 <p class="checkout-cod-note" data-cod-note hidden><i class="bi bi-info-circle"></i> COD hanya untuk <b>Ambil di Toko</b> atau <b>Kurir Toko</b>. Untuk ekspedisi, gunakan QRIS / Virtual Account.</p>
             </section>

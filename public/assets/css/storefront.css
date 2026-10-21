@@ -205,3 +205,19 @@
 .catalog-pagination .page-nav span{font-size:.85rem}
 .catalog-pagination .page-dots{color:#999;padding:0 .15rem}
 @media (max-width:640px){.catalog-pagination .page-nav span{display:none}.catalog-pagination .page-btn{min-width:2.2rem;height:2.2rem;padding:0 .55rem}}
+
+/* V17.0.37 — kartu COD nonaktif + banner siapkan uang + batal pesanan */
+.payment-method-card.disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.4)}
+.payment-method-card.disabled:hover{transform:none;border-color:inherit}
+.cod-prepare-banner{display:flex;gap:14px;align-items:center;margin:0 0 18px;padding:18px 20px;border-radius:18px;background:#111;color:#fff;box-shadow:0 12px 30px rgba(0,0,0,.16)}
+.cod-prepare-banner i{font-size:26px;line-height:1}
+.cod-prepare-banner b{display:block;font-size:19px;letter-spacing:.2px}
+.cod-prepare-banner span{display:block;font-size:13px;opacity:.82;margin-top:4px}
+.cancel-window-box{margin-top:12px;padding:14px 16px;border:1px solid rgba(190,18,60,.28);border-radius:16px;background:rgba(190,18,60,.05)}
+.cancel-window-box b{display:block;font-size:14px}
+.cancel-window-box small{display:block;margin:4px 0 10px;color:#6b7280}
+.cancel-window-box .cancel-timer{font-variant-numeric:tabular-nums;font-weight:700;color:#be123c}
+.cancel-window-box button{width:100%;border:1px solid rgba(190,18,60,.4);background:#fff;color:#be123c;border-radius:12px;padding:11px 14px;font-weight:600}
+.cancel-window-box button:hover{background:#be123c;color:#fff}
+.cancel-window-box.locked{border-color:rgba(107,114,128,.28);background:rgba(107,114,128,.06)}
+.cancel-window-box.locked small{color:#6b7280}
