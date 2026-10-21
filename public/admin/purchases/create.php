@@ -169,7 +169,11 @@ if (is_post()) {
             $avgPrice = avg_hpp((float)$before, $oldPrice, (float)$qty, $newPrice);
 
             // Update master HPP (produk induk & varian) dengan harga rata-rata
-            $db->prepare("UPDATE products SET purchase_price=?, updated_at=NOW() WHERE id=?")->execute([$avgPrice, $item['product_id']]);
+            // V17.0.24: pembelian varian hanya mengubah HPP varian. Modal INDUK jangan ditimpa
+            // harga rata-rata varian (dulu membuat nilai modal produk ber-varian jadi salah).
+            if ($variantId <= 0) {
+                $db->prepare("UPDATE products SET purchase_price=?, updated_at=NOW() WHERE id=?")->execute([$avgPrice, $item['product_id']]);
+            }
             if ($variantId > 0) {
                 $db->prepare("UPDATE marketplace_product_variants SET purchase_price=?, updated_at=NOW() WHERE id=? AND product_id=?")
                     ->execute([$avgPrice, $variantId, $item['product_id']]);

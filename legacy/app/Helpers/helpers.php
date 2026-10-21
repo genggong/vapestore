@@ -481,3 +481,11 @@ function upload_product_image(array $file): ?string
 {
     return legacy_store_optimized_image($file, 'uploads/products', 'product', 8*1024*1024, 1600, 1600, 78);
 }
+
+// V17.0.24: foto kategori (kartu kategori storefront bisa memakai gambar, bukan icon Bootstrap)
+function upload_category_image(array $file): ?string
+{
+    if (empty($file['name']) || empty($file['tmp_name'])) return null;
+    return legacy_store_optimized_image($file, 'uploads/categories', 'category', 4 * 1024 * 1024, 900, 900, 82);
+}
+

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Vapekong System Upgrade / Schema Doctor v17.0.23
+ * Vapekong System Upgrade / Schema Doctor v17.0.24
  * Safe policy: CREATE/ALTER/INDEX only. No DROP/TRUNCATE and no business-row DELETE.
  */
 
@@ -47,7 +47,7 @@ function vk_sys_expected_schema(): array
         'role_permissions' => ['id','role_id','permission_key','is_allowed','created_at'],
         'users' => ['id','role_id','branch_id','name','username','email','phone','password','status','last_login_at','created_at'],
         'branches' => ['id','code','name','phone','address','is_main','is_active','created_at'],
-        'categories' => ['id','name','slug','icon','color','description','sort_order','is_active','created_at'],
+        'categories' => ['id','name','slug','icon','color','description','image','sort_order','is_active','created_at'],
         'suppliers' => ['id','name','phone','email','address','note','is_active','created_at'],
         'customers' => ['id','name','phone','email','address','member_code','member_level','price_level','points','credit_limit','status','created_at'],
         'payment_methods' => ['id','name','code','icon','is_active','sort_order','created_at'],
@@ -420,7 +420,7 @@ function vk_sys_status(PDO $db): array
 }
 
 /**
- * Ringkasan kesehatan scanner v17.0.23.
+ * Ringkasan kesehatan scanner v17.0.24.
  * Memisahkan masalah inti (DB/routing/asset/checkout) dari peringatan media lama.
  * Tujuannya agar file gambar lama yang hilang tidak lagi dianggap sebagai kegagalan upgrade database.
  */
@@ -598,6 +598,8 @@ function vk_sys_upgrade(PDO $db): array
         ['warehouses','address','TEXT NULL'],
         ['warehouses','is_main','TINYINT(1) NOT NULL DEFAULT 0'],
         ['warehouses','note','TEXT NULL'],
+        // v17.0.24: foto kategori untuk kartu kategori storefront
+        ['categories','image','VARCHAR(255) NULL'],
     ];
     foreach($columns as [$t,$c,$d]){
         try{ vk_sys_add_column($db,$t,$c,$d,$log); }catch(Throwable $e){ $log[]="GAGAL COLUMN {$t}.{$c}: ".$e->getMessage(); }

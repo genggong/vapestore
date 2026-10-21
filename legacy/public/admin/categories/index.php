@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../../app/bootstrap.php';
+require_once __DIR__ . '/_helpers.php';
 Auth::requireRole(['super_admin','owner']);
 $pageTitle = 'Kategori Produk';
 $db = Database::connect();
@@ -45,7 +46,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
         <tbody>
         <?php foreach ($categories as $cat): ?>
           <tr>
-            <td><div class="table-title"><span class="table-icon" style="background:<?= e($cat['color']); ?>20;color:<?= e($cat['color']); ?>"><i class="bi <?= e($cat['icon']); ?>"></i></span><div><b><?= e($cat['name']); ?></b><small class="table-subtext">Kategori produk toko</small></div></div></td>
+            <td><div class="table-title"><span class="table-icon" style="background:<?= e($cat['color']); ?>20;color:<?= e($cat['color']); ?>;overflow:hidden"><?php if (!empty($cat['image'])): ?><img src="<?= e(category_image_url($cat['image'])); ?>" alt="<?= e($cat['name']); ?>" style="width:100%;height:100%;object-fit:cover"><?php else: ?><i class="bi <?= e($cat['icon']); ?>"></i><?php endif; ?></span><div><b><?= e($cat['name']); ?></b><small class="table-subtext">Kategori produk toko</small></div></div></td>
             <td><code><?= e($cat['slug']); ?></code></td>
             <td><span class="color-dot" style="background:<?= e($cat['color']); ?>"></span> <?= e($cat['color']); ?></td>
             <td><?= e($cat['sort_order']); ?></td>

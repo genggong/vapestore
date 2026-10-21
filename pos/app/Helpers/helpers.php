@@ -252,3 +252,19 @@ function upload_product_image(array $file): ?string
 
     return 'uploads/products/' . $filename;
 }
+
+// V17.0.24: foto kategori (kartu kategori storefront bisa memakai gambar, bukan icon Bootstrap)
+function upload_category_image(array $file): ?string
+{
+    if (empty($file['name']) || empty($file['tmp_name'])) return null;
+    if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) throw new Exception('Upload foto kategori gagal.');
+    if (($file['size'] ?? 0) > 4 * 1024 * 1024) throw new Exception('Ukuran foto kategori maksimal 4MB.');
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) throw new Exception('Format foto kategori harus JPG, PNG, atau WEBP.');
+    $dir = __DIR__ . '/../../public/uploads/categories';
+    if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) throw new Exception('Folder uploads/categories tidak dapat dibuat.');
+    $filename = 'category-' . date('YmdHis') . '-' . bin2hex(random_bytes(4)) . '.' . $ext;
+    if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $filename)) throw new Exception('Gagal menyimpan foto kategori.');
+    return 'uploads/categories/' . $filename;
+}
+

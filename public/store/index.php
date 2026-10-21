@@ -86,7 +86,7 @@ if ($promo) {
         <div class="category-grid reveal delay-1">
             <?php if ($categories): foreach ($categories as $cat): ?>
                 <a class="category-card" href="<?= base_url('produk?category=' . urlencode($cat['slug'])); ?>">
-                    <span class="category-icon category-image"><img src="<?= e(storefront_category_image($cat['name'])); ?>" alt="<?= e($cat['name']); ?>"></span>
+                    <span class="category-icon category-image"><img src="<?= e(storefront_category_image($cat['name'], $cat['image'] ?? null)); ?>" alt="<?= e($cat['name']); ?>"></span>
                     <strong><?= e($cat['name']); ?></strong><small><?= (int) $cat['product_count']; ?>+ Produk</small>
                     <span class="category-arrow"><i class="bi bi-arrow-up-right"></i></span>
                 </a>

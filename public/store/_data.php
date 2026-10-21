@@ -127,9 +127,31 @@ function storefront_category_key(?string $categoryName): string
     return 'default';
 }
 
-function storefront_category_image(?string $categoryName): string
+function storefront_category_image(?string $categoryName, ?string $image = null): string
 {
-    return storefront_asset_url('category-' . storefront_category_key($categoryName) . '.svg');
+    // V17.0.24: foto kategori dari menu Kategori (POS/admin) menggantikan icon/SVG.
+    $path = trim((string) $image);
+    if ($path === '' && $categoryName !== null && trim($categoryName) !== '') {
+        static $cache = [];
+        $key = strtolower(trim($categoryName));
+        if (!array_key_exists($key, $cache)) {
+            $cache[$key] = '';
+            $db = storefront_db();
+            if ($db) {
+                try {
+                    $st = $db->prepare('SELECT image FROM categories WHERE name = ? LIMIT 1');
+                    $st->execute([$categoryName]);
+                    $cache[$key] = trim((string) $st->fetchColumn());
+                } catch (Throwable $e) {
+                    $cache[$key] = '';
+                }
+            }
+        }
+        $path = $cache[$key];
+    }
+    $fallback = 'category-' . storefront_category_key($categoryName) . '.svg';
+    if ($path !== '') return storefront_visual_url($path, $fallback);
+    return storefront_asset_url($fallback);
 }
 
 function storefront_product_fallback(array $product): string
@@ -152,7 +174,7 @@ function storefront_categories(int $limit = 8): array
     $db = storefront_db();
     if (!$db) return [];
     try {
-        $stmt = $db->prepare("\n            SELECT c.id, c.name, c.slug, c.icon, c.description, COUNT(p.id) product_count\n            FROM categories c\n            LEFT JOIN products p ON p.category_id = c.id AND p.is_active = 1\n            WHERE c.is_active = 1\n            GROUP BY c.id, c.name, c.slug, c.icon, c.description, c.sort_order\n            ORDER BY c.sort_order ASC, c.name ASC\n            LIMIT " . max(1, min(20, $limit))
+        $stmt = $db->prepare("\n            SELECT c.id, c.name, c.slug, c.icon, c.description, c.image, COUNT(p.id) product_count\n            FROM categories c\n            LEFT JOIN products p ON p.category_id = c.id AND p.is_active = 1\n            WHERE c.is_active = 1\n            GROUP BY c.id, c.name, c.slug, c.icon, c.description, c.image, c.sort_order\n            ORDER BY c.sort_order ASC, c.name ASC\n            LIMIT " . max(1, min(20, $limit))
         );
         $stmt->execute();
         return $stmt->fetchAll() ?: [];

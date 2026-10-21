@@ -38,6 +38,7 @@ if (is_post()) {
         redirect('admin/stock-requests/create.php');
     }
 
+    $shortages = [];
     try {
         $db->beginTransaction();
         $requestNumber = warehouse_request_number($db);
@@ -53,8 +54,11 @@ if (is_post()) {
 
             $variant=null;if($variantId>0){$vs=$db->prepare("SELECT * FROM marketplace_product_variants WHERE id=? AND product_id=? LIMIT 1");$vs->execute([$variantId,$productId]);$variant=$vs->fetch();if(!$variant)throw new Exception('Varian produk tidak ditemukan.');$ws=warehouse_variant_stock($db,$warehouseId,$productId,$variantId,true);}else{$ws=warehouse_stock($db,$warehouseId,$productId,true);}
             $available = (int)$ws['stock'];
+            // V17.0.24: request = permintaan cabang, bukan pengeluaran stok. Kekurangan stok gudang
+            // TIDAK lagi memblokir pembuatan request (stok gudang 0 tetap bisa request); pengecekan
+            // keras dilakukan saat PEMENUHAN (action.php) ketika stok benar-benar dikeluarkan.
             if ($available < $qty) {
-                throw new Exception('Stok gudang untuk ' . $product['name'] . ' tidak cukup. Tersedia ' . $available . ' ' . $product['unit'] . '.');
+                $shortages[] = $product['name'] . ' (minta ' . $qty . ', tersedia ' . $available . ' ' . $product['unit'] . ')';
             }
             $unitCost = (float)$ws['purchase_price'];
             if ($unitCost <= 0) $unitCost = (float)$product['purchase_price'];
@@ -74,7 +78,11 @@ if (is_post()) {
 
         Auth::log('create_stock_request', 'Membuat request stok ' . $requestNumber . ' untuk ' . $currentBranch['name']);
         $db->commit();
-        flash('success', 'Request stok berhasil dikirim ke gudang.');
+        if ($shortages) {
+            flash('warning', 'Request terkirim, tetapi stok gudang belum cukup: ' . implode('; ', $shortages) . '. Stok akan dicek saat pemenuhan.');
+        } else {
+            flash('success', 'Request stok berhasil dikirim ke gudang.');
+        }
         redirect('admin/stock-requests/detail.php?id=' . $requestId);
     } catch (Throwable $e) {
         if ($db->inTransaction()) $db->rollBack();
