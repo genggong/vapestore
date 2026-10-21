@@ -69,6 +69,18 @@ Lalu **Purge All** (LiteSpeed Web Cache Manager).
    jadi rata-rata, modal **induk** tidak berubah.
 4. `/admin/system-upgrade/index.php` → **v17.0.24**.
 
+## Rollback berkas (kalau ada yang tidak sesuai)
+
+Script apply otomatis menyiapkan rollback di folder `backup_17.0.24_<tanggal>/`:
+
+```bash
+cd ~/public_html
+bash backup_17.0.24_*/rollback.sh
+```
+
+Script ini memulihkan **29 berkas** yang ditimpa (dari `.bak`) dan menyisakan 3 berkas **baru**
+(`*/admin/categories/_helpers.php`) — aman dibiarkan. Setelah rollback: **Purge All** lalu tes `/` dan `/admin`.
+
 ## Hasil uji lokal (bukan klaim)
 
 - **Foto kategori**: upload PNG lewat form → baris DB berisi `uploads/categories/category-….png`,

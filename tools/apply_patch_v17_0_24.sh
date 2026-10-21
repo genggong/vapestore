@@ -34,6 +34,27 @@ while IFS= read -r f; do
 done < <(unzip -Z1 "${ZIP}")
 echo "    ${COUNT} berkas di paket (yang sudah ada dibackup)"
 
+# Rollback siap pakai: JANGAN pakai salinan mentah "${b%.bak}" — path-nya masih di dalam
+# folder backup, jadi berkas kembali ke folder backup, bukan ke docroot. Skrip ini
+# membuang prefiks folder backup dulu, baru menimpa berkas aslinya.
+cat > "${BACKUP_DIR}/rollback.sh" <<'ROLLBACK'
+#!/usr/bin/env bash
+set -u
+cd "$(dirname "$0")" || exit 1
+BASE="$(pwd)"
+cd .. || exit 1
+N=0
+while IFS= read -r b; do
+  rel="${b#"$BASE"/}"
+  dest="${rel%.bak}"
+  if cp -p "$b" "$dest"; then echo "  pulih: $dest"; N=$((N+1)); fi
+done < <(find "$BASE" -name '*.bak')
+echo "Rollback selesai: $N berkas dipulihkan."
+echo "Berkas BARU dari patch (mis. admin/categories/_helpers.php) tidak dihapus otomatis — aman dibiarkan."
+echo "Lanjutkan: Purge All, lalu tes /  dan /admin."
+ROLLBACK
+chmod +x "${BACKUP_DIR}/rollback.sh"
+
 echo "==> Timpa berkas..."
 unzip -o -q "${ZIP}"
 rm -f "${ZIP}"
@@ -54,7 +75,7 @@ if [ $FAIL -ne 0 ]; then
   echo
   echo "!! Ada marker yang tidak cocok. Berkas sudah ter-unzip (ditimpa), jadi kemungkinan besar"
   echo "   hosting memakai generasi berkas yang berbeda. Jangan panik: rollback ada di ${BACKUP_DIR}."
-  echo "   Rollback: for b in \$(find ${BACKUP_DIR} -name '*.bak'); do cp -p \"\$b\" \"\${b%.bak}\"; done"
+  echo "   Rollback: bash ${BACKUP_DIR}/rollback.sh"
   exit 1
 fi
 
@@ -70,5 +91,5 @@ echo "    1. Kategori -> Edit -> pilih Foto Kategori -> Update -> buka homepage 
 echo "    2. Request Stock dengan stok gudang 0 -> harus berhasil + peringatan kuning."
 echo "    3. Pembelian varian dengan harga beda -> modal varian jadi rata-rata, modal induk tetap."
 echo
-echo "==> Rollback berkas: for b in \$(find ${BACKUP_DIR} -name '*.bak'); do cp -p \"\$b\" \"\${b%.bak}\"; done"
+echo "==> Rollback berkas: bash ${BACKUP_DIR}/rollback.sh"
 echo "==> Folder backup: ${BACKUP_DIR}"
