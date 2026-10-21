@@ -1780,10 +1780,66 @@ if (typeof window.Html5Qrcode === 'undefined') {
         fireToast(product.name + ' masuk keranjang','success');
     }
 
+    // V17.0.42 — pencarian pintar: "xli 3ml" tetap menemukan "Cartridge Oxva Xlim V3 Top Fill 3ml".
+    function posSearchTokens(query){
+        return String(query || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9.]+/g, ' ')
+            .split(' ')
+            .filter(function(t){ return t.length > 0; });
+    }
+
+    function posSearchScore(text, tokens){
+        let score = 0;
+        for (let i = 0; i < tokens.length; i += 1) {
+            const at = text.indexOf(tokens[i]);
+            if (at < 0) return -1;
+            score += at === 0 ? 4 : (text.charAt(at - 1) === ' ' ? 3 : 1);
+        }
+        return score;
+    }
+
+    function applyPosSmartSearch(query){
+        const grid = qs('#posProductsGridTheme');
+        const tokens = posSearchTokens(query);
+        const cards = qsa('.pos-product-card');
+
+        if (!tokens.length) {
+            cards.forEach(function(card){ card.style.display = ''; });
+            return;
+        }
+
+        const hits = [];
+        cards.forEach(function(card){
+            const text = (
+                (card.dataset.name || '') + ' ' +
+                (card.dataset.code || '') + ' ' +
+                (card.dataset.barcode || '') + ' ' +
+                (card.dataset.variant || '') + ' ' +
+                (card.dataset.category || '') + ' ' +
+                card.textContent
+            ).toLowerCase();
+            const score = posSearchScore(text, tokens);
+            const show = score >= 0;
+            card.style.display = show ? '' : 'none';
+            if (show) hits.push([score, card]);
+        });
+
+        if (grid && hits.length) {
+            hits.sort(function(a, b){ return b[0] - a[0]; });
+            hits.forEach(function(pair){ grid.appendChild(pair[1]); });
+        }
+    }
+
+    function visibleProductCards(){
+        return qsa('.pos-product-card').filter(function(card){ return card.style.display !== 'none'; });
+    }
+
     function resetProductFilter(){
         const search = qs('#posSearchTheme');
         if(search) search.value = '';
         qsa('.pos-product-card').forEach(card=>{ card.style.display = ''; });
+        sortProductCards(qs('#posSortTheme')?.value || 'az');
     }
 
     function sortProductCards(mode){
@@ -2107,11 +2163,7 @@ if (typeof window.Html5Qrcode === 'undefined') {
             renderMemberSearchResults(e.target.value);
         }
         if(e.target.matches('#posSearchTheme')){
-            const key = e.target.value.toLowerCase();
-            qsa('.pos-product-card').forEach(card=>{
-                const text = (card.textContent + ' ' + card.dataset.code + ' ' + card.dataset.barcode).toLowerCase();
-                card.style.display = !key || text.includes(key) ? '' : 'none';
-            });
+            applyPosSmartSearch(e.target.value);
         }
         if(e.target.matches('[data-qty]')) setQty(e.target.dataset.qty, e.target.value);
         if(e.target.matches('#manualDiscountTheme,#paidTheme,#redeemPointsTheme')) updateTotals();
@@ -2140,7 +2192,13 @@ if (typeof window.Html5Qrcode === 'undefined') {
             const code = e.target.value.trim();
             if(code){
                 e.preventDefault();
-                addProductByScannedCode(code);
+                // V17.0.42 — Enter pada hasil pencarian: kalau tinggal satu produk, langsung masuk keranjang.
+                const shown = visibleProductCards();
+                if (shown.length === 1) {
+                    shown[0].click();
+                } else {
+                    addProductByScannedCode(code);
+                }
             }
             return;
         }
