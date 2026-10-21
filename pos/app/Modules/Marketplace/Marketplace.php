@@ -1278,7 +1278,15 @@ function marketplace_order_notify_message(PDO $db, array $order): string
         $lines[] = 'Ongkir: Rp ' . number_format((float) $order['shipping_cost'], 0, ',', '.');
     }
     $pay = (string) ($order['payment_status'] ?? 'pending');
-    $lines[] = 'Pembayaran: ' . ($pay === 'paid' ? 'LUNAS' : strtoupper($pay) . ' (' . strtoupper((string) ($order['payment_method'] ?? '')) . ')');
+    $methodLabel = strtoupper((string) ($order['payment_method'] ?? ''));
+    if ($pay === 'paid') {
+        $lines[] = 'Pembayaran: LUNAS' . ($methodLabel !== '' ? ' (' . $methodLabel . ')' : '');
+    } elseif ($methodLabel === 'COD' && $pay === 'unpaid') {
+        $lines[] = 'Pembayaran: BAYAR DI TEMPAT (COD) — tunai ' . (strtolower((string) ($order['courier_code'] ?? '')) === 'pickup' ? 'saat ambil di toko' : 'saat pesanan diterima');
+        $lines[] = 'Tagihan: Rp ' . number_format((float) ($order['grand_total'] ?? 0), 0, ',', '.');
+    } else {
+        $lines[] = 'Pembayaran: ' . strtoupper($pay) . ' (' . $methodLabel . ')';
+    }
     $lines[] = 'Waktu: ' . date('d/m/Y H:i');
     $lines[] = '';
     $lines[] = 'Segera proses dari menu Marketplace > Pesanan.';
@@ -1441,7 +1449,15 @@ function marketplace_create_order(PDO $db, array $payload): array
     }
 
     $paymentMethod = strtolower(trim((string) ($payload['payment_method'] ?? 'qris')));
-    if (!isset(marketplace_pakasir_methods()[$paymentMethod])) throw new InvalidArgumentException('Metode pembayaran tidak valid.');
+    $isCod = $paymentMethod === 'cod';
+    if ($isCod) {
+        // V17.0.34 — COD hanya boleh untuk pengambilan di toko atau kurir toko.
+        if (!marketplace_cod_allowed((string) $requestedCourier)) {
+            throw new InvalidArgumentException('Bayar di Tempat (COD) hanya tersedia untuk Ambil di Toko atau Kurir Toko.');
+        }
+    } elseif (!isset(marketplace_pakasir_methods()[$paymentMethod])) {
+        throw new InvalidArgumentException('Metode pembayaran tidak valid.');
+    }
 
     $idempotency = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) ($payload['checkout_key'] ?? ''));
     if ($idempotency === '' || strlen($idempotency) < 12) $idempotency = bin2hex(random_bytes(16));
@@ -1563,7 +1579,13 @@ function marketplace_create_order(PDO $db, array $payload): array
         foreach ($cart['items'] as $item) {
             $itemStmt->execute([$orderId,$item['product_id'],$item['variant_id'] ?: null,$item['product_code'],$item['name'],$item['variant_name'] ?: null,$item['variant_sku'] ?: null,(int)($item['flash_sale']['flash_sale_item_id']??0) ?: null,$item['unit'],$item['qty'],$item['price'],$item['purchase_price'],$item['weight_gram'],$item['line_total']]);
         }
-        marketplace_add_event($db, $orderId, 'pending_payment', 'Pesanan dibuat', 'Menunggu pembayaran pelanggan.');
+        if ($isCod) {
+            $db->prepare("UPDATE online_orders SET payment_status='unpaid', order_status='confirmed', fulfillment_status=?, payment_expired_at=NULL, updated_at=NOW() WHERE id=?")
+               ->execute([$requestedCourier === 'pickup' ? 'waiting_pick' : 'waiting', $orderId]);
+            marketplace_add_event($db, $orderId, 'cod_confirmed', 'Pesanan diterima (COD)', marketplace_cod_instruction(['courier_code' => $requestedCourier, 'grand_total' => $grandTotal]));
+        } else {
+            marketplace_add_event($db, $orderId, 'pending_payment', 'Pesanan dibuat', 'Menunggu pembayaran pelanggan.');
+        }
         $db->commit();
     } catch (Throwable $e) {
         if ($db->inTransaction()) $db->rollBack();
@@ -1571,7 +1593,9 @@ function marketplace_create_order(PDO $db, array $payload): array
     }
 
     // Create payment after the order is committed. The v2 endpoint is idempotent for the same order/body.
+    // V17.0.34 — COD tidak membuat instruksi pembayaran online.
     try {
+        if ($isCod) { $payment = null; } else {
         $payment = marketplace_pakasir_create($db, $orderNumber, $grandAmount, $paymentMethod);
         $expired = marketplace_datetime_from_iso($payment['expired_at'] ?? null);
         $stmt = $db->prepare("UPDATE online_orders SET payment_txn_id=?,payment_amount=?,payment_fee=?,payment_total=?,payment_qr_string=?,payment_va_number=?,payment_link=?,payment_status=?,payment_expired_at=?,updated_at=NOW() WHERE order_number=?");
@@ -1586,9 +1610,12 @@ function marketplace_create_order(PDO $db, array $payload): array
             marketplace_add_event($db, $orderId, 'paid', 'Pembayaran berhasil', 'Pembayaran terkonfirmasi otomatis.');
             marketplace_award_customer_points($db, $orderId);
         }
+        }
     } catch (Throwable $e) {
-        $db->prepare("UPDATE online_orders SET payment_status='error',updated_at=NOW() WHERE order_number=?")->execute([$orderNumber]);
-        marketplace_add_event($db, $orderId, 'payment_error', 'Pembayaran belum berhasil dibuat', $e->getMessage());
+        if (!$isCod) {
+            $db->prepare("UPDATE online_orders SET payment_status='error',updated_at=NOW() WHERE order_number=?")->execute([$orderNumber]);
+            marketplace_add_event($db, $orderId, 'payment_error', 'Pembayaran belum berhasil dibuat', $e->getMessage());
+        }
     }
 
     // V17.0.30 — antre notifikasi WA cabang, lalu kirim setelah respons selesai (tidak menahan checkout).
@@ -1886,9 +1913,90 @@ function marketplace_order_status_label(string $status): string
     return $labels[$status] ?? ucwords(str_replace('_', ' ', $status));
 }
 
+/** V17.0.34 — COD hanya untuk Ambil di Toko / Kurir Toko. */
+/** V17.0.34 — notifikasi WhatsApp ke kurir toko saat paket ditugaskan. */
+function marketplace_courier_wa_message(PDO $db, array $order, array $courier): string
+{
+    $lines = [];
+    $lines[] = '*TUGAS KURIR TOKO*';
+    $lines[] = 'Halo ' . (string) ($courier['name'] ?? 'Kurir') . ', ada paket baru untuk diantar.';
+    $lines[] = '';
+    $lines[] = 'No: ' . (string) ($order['order_number'] ?? '-');
+    $lines[] = 'Cabang: ' . (string) ($order['branch_name'] ?? '-');
+    $lines[] = 'Penerima: ' . (string) ($order['recipient_name'] ?? '-') . ' (' . (string) ($order['recipient_phone'] ?? '-') . ')';
+    $addr = trim((string) ($order['address'] ?? ''));
+    if ($addr !== '') $lines[] = 'Alamat: ' . preg_replace('/\s+/', ' ', $addr);
+    if (!empty($order['destination_label'])) $lines[] = 'Wilayah: ' . (string) $order['destination_label'];
+    $lines[] = 'Ongkir: Rp ' . number_format((float) ($order['shipping_cost'] ?? 0), 0, ',', '.');
+    $lines[] = 'Total pesanan: Rp ' . number_format((float) ($order['grand_total'] ?? 0), 0, ',', '.');
+    if (strtolower((string) ($order['payment_method'] ?? '')) === 'cod' && (string) ($order['payment_status'] ?? '') !== 'paid') {
+        $lines[] = '';
+        $lines[] = '*BAYAR DI TEMPAT (COD)*';
+        $lines[] = 'Tagih tunai: Rp ' . number_format((float) ($order['grand_total'] ?? 0), 0, ',', '.') . ' saat serah terima.';
+    }
+    $note = trim((string) ($order['customer_note'] ?? ''));
+    if ($note !== '') $lines[] = 'Catatan: ' . preg_replace('/\s+/', ' ', $note);
+    $items = [];
+    try {
+        $s = $db->prepare("SELECT product_name, variant_name, qty FROM online_order_items WHERE order_id=? ORDER BY id");
+        $s->execute([(int) ($order['id'] ?? 0)]);
+        foreach (($s->fetchAll() ?: []) as $it) {
+            $items[] = '- ' . (string) $it['product_name'] . (!empty($it['variant_name']) ? ' - ' . $it['variant_name'] : '') . ' x' . (int) $it['qty'];
+        }
+    } catch (Throwable $e) {}
+    if ($items) { $lines[] = ''; $lines[] = 'Item:'; foreach ($items as $l) $lines[] = $l; }
+    $lines[] = '';
+    $lines[] = 'Buka Portal Kurir untuk menerima tugas & konfirmasi.';
+    return implode("\n", $lines);
+}
+
+function marketplace_notify_store_courier(PDO $db, int $orderId, int $courierId): array
+{
+    $s = $db->prepare("SELECT * FROM online_orders WHERE id=? LIMIT 1");
+    $s->execute([$orderId]);
+    $order = $s->fetch();
+    if (!$order) return ['status' => 'skipped', 'error' => 'Pesanan tidak ditemukan.'];
+
+    $courier = function_exists('marketplace_store_courier_get') ? marketplace_store_courier_get($db, $courierId) : null;
+    if (!$courier) return ['status' => 'skipped', 'error' => 'Kurir tidak ditemukan.'];
+
+    $phone = trim((string) ($courier['phone'] ?? ''));
+    if ($phone === '') return ['status' => 'skipped', 'error' => 'Nomor WhatsApp kurir kosong.'];
+
+    $message = marketplace_courier_wa_message($db, $order, $courier);
+    $res = marketplace_order_send_wa($db, $phone, $message, $orderId);
+
+    if (function_exists('marketplace_add_event')) {
+        $ok = ($res['status'] ?? '') === 'sent';
+        marketplace_add_event($db, $orderId, $ok ? 'courier_notified' : 'courier_notify_failed',
+            $ok ? 'Kurir toko diberi tahu via WhatsApp' : 'Notifikasi WhatsApp ke kurir gagal',
+            'Kurir: ' . (string) ($courier['name'] ?? '-') . ' (' . $phone . ')' . ($ok ? '' : ' — ' . (string) ($res['error'] ?? 'unknown')));
+    }
+    return $res + ['courier' => (string) ($courier['name'] ?? ''), 'target' => $phone];
+}
+
+function marketplace_cod_enabled(): bool
+{
+    $v = strtolower(trim((string) setting('marketplace_cod_enabled', 'on')));
+    return !in_array($v, ['off', '0', 'no', 'nonaktif', 'false'], true);
+}
+
+function marketplace_cod_allowed(string $courierCode): bool
+{
+    if (!marketplace_cod_enabled()) return false;
+    return in_array(strtolower(trim($courierCode)), ['pickup', 'store'], true);
+}
+
+function marketplace_cod_instruction(array $order): string
+{
+    $pickup = strtolower((string) ($order['courier_code'] ?? '')) === 'pickup';
+    $total = 'Rp ' . number_format((float) ($order['grand_total'] ?? 0), 0, ',', '.');
+    return 'Bayar tunai ' . $total . ' saat ' . ($pickup ? 'ambil di toko' : 'pesanan diterima dari kurir toko') . '.';
+}
+
 function marketplace_payment_status_label(string $status): string
 {
-    $labels = ['pending'=>'Menunggu','paid'=>'Lunas','error'=>'Perlu Coba Lagi','expired'=>'Kedaluwarsa','failed'=>'Gagal','cancelled'=>'Dibatalkan'];
+    $labels = ['pending'=>'Menunggu','unpaid'=>'Bayar di Tempat','paid'=>'Lunas','error'=>'Perlu Coba Lagi','expired'=>'Kedaluwarsa','failed'=>'Gagal','cancelled'=>'Dibatalkan'];
     return $labels[$status] ?? ucwords(str_replace('_', ' ', $status));
 }
 

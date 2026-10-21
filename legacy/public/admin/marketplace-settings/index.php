@@ -52,6 +52,7 @@ if(is_post()){
         $_POST['marketplace_wa_enabled']=(($_POST['marketplace_wa_enabled']??'off')==='on')?'on':'off';
         $_POST['marketplace_store_courier_enabled']=(($_POST['marketplace_store_courier_enabled']??'off')==='on')?'on':'off';
         $_POST['marketplace_store_pickup_enabled']=(($_POST['marketplace_store_pickup_enabled']??'off')==='on')?'on':'off';
+        $_POST['marketplace_cod_enabled']=(($_POST['marketplace_cod_enabled']??'on')==='on')?'on':'off';
         $pickupBranchIds=[];foreach((array)($_POST['marketplace_store_pickup_branch_ids']??[]) as $bid){$bid=(int)$bid;if($bid>0)$pickupBranchIds[$bid]=$bid;} $pickupBranchIds=array_values($pickupBranchIds);
         $_POST['marketplace_store_courier_fee']=(string)max(0,min(10000000,(int)($_POST['marketplace_store_courier_fee']??0)));
         $storeCoverage=strtolower(trim((string)($_POST['marketplace_store_courier_coverage']??'same_city')));
@@ -83,6 +84,7 @@ if(is_post()){
         mp_setting_save($db,'marketplace_order_wa_target',trim((string)($_POST['marketplace_order_wa_target']??'')));
         mp_setting_save($db,'marketplace_store_courier_enabled',$_POST['marketplace_store_courier_enabled']);
         mp_setting_save($db,'marketplace_store_pickup_enabled',$_POST['marketplace_store_pickup_enabled']);
+        mp_setting_save($db,'marketplace_cod_enabled',$_POST['marketplace_cod_enabled']);
         mp_setting_save($db,'marketplace_store_pickup_branch_ids',implode(',',array_map('intval',$pickupBranchIds)));
         foreach(array_keys(marketplace_wa_event_options()) as $evt){ $k='marketplace_wa_notify_'.$evt; mp_setting_save($db,$k,$_POST[$k]); }
         mp_setting_save($db,'rajaongkir_couriers',implode(':',$enabledCouriers));
@@ -212,6 +214,7 @@ require_once __DIR__.'/../../layouts/admin-header.php';require_once __DIR__.'/..
 <div class="system-field"><label>Model Tarif</label><select name="marketplace_store_courier_rate_mode"><option value="flat" <?= $v('marketplace_store_courier_rate_mode','flat')==='flat'?'selected':''; ?>>Ongkir Flat</option><option value="subdistrict" <?= $v('marketplace_store_courier_rate_mode','flat')==='subdistrict'?'selected':''; ?>>Ongkir per Kelurahan/Desa</option></select><small>Mode per Kelurahan hanya menampilkan Kurir Toko jika tujuan sudah mempunyai tarif aktif.</small></div>
 <div class="system-field"><label>Ongkir Flat</label><input type="number" name="marketplace_store_courier_fee" min="0" max="10000000" step="1000" value="<?= e($v('marketplace_store_courier_fee','10000')); ?>"><small>Dipakai hanya jika Model Tarif = Ongkir Flat.</small></div>
 <div class="system-field"><label>Estimasi Default</label><input name="marketplace_store_courier_eta" maxlength="80" value="<?= e($v('marketplace_store_courier_eta','1-3 jam')); ?>" placeholder="1-3 jam"></div>
+<div class="system-field"><label>Bayar di Tempat (COD)</label><select name="marketplace_cod_enabled"><option value="on" <?= $v('marketplace_cod_enabled','on')==='on'?'selected':''; ?>>Aktif</option><option value="off" <?= $v('marketplace_cod_enabled','off')==='off'?'selected':''; ?>>Nonaktif</option></select><small>Pelanggan bisa bayar tunai untuk <b>Ambil di Toko</b> dan <b>Kurir Toko</b>. Ekspedisi tetap QRIS/VA.</small></div>
 <div class="system-field"><label>Tarif per Kelurahan</label><a class="btn-soft" href="<?= e(legacy_base_url('admin/marketplace-courier-rates/index.php')); ?>"><i class="bi bi-geo-alt-fill"></i> Atur Tarif Kelurahan</a><small>Setiap Kelurahan/Desa bisa memiliki ongkir dan estimasi sendiri.</small></div>
 <div class="system-field full"><label>Area Layanan</label><select name="marketplace_store_courier_coverage"><option value="same_district" <?= $v('marketplace_store_courier_coverage','same_city')==='same_district'?'selected':''; ?>>Hanya kecamatan yang sama dengan toko</option><option value="same_city" <?= $v('marketplace_store_courier_coverage','same_city')==='same_city'?'selected':''; ?>>Kota/Kabupaten yang sama</option><option value="same_province" <?= $v('marketplace_store_courier_coverage')==='same_province'?'selected':''; ?>>Provinsi yang sama</option><option value="all" <?= $v('marketplace_store_courier_coverage')==='all'?'selected':''; ?>>Semua wilayah yang dipilih customer</option></select><small>Perbandingan area menggunakan wilayah asal RajaOngkir yang sudah dipilih di atas.</small></div>
 <div class="system-field full"><div class="mp-note"><b>Portal Kurir:</b> <a href="<?= e(legacy_base_url('kurir/login')); ?>" target="_blank" rel="noopener"><?= e(legacy_base_url('kurir/login')); ?></a><br>Akun kurir dibuat dari menu <b>Kurir Toko</b> di admin.</div></div>

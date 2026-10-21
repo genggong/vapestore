@@ -10,7 +10,8 @@ $pickupConfig = marketplace_store_pickup_config();
 $deliveryReady = $db && $raja['api_key'] !== '' && $raja['origin_id'] > 0;
 $pickupReady = $db && !empty($pickupConfig['enabled']);
 $paymentReady = $db && $payConfig['project'] !== '' && $payConfig['api_key'] !== '';
-$checkoutReady = $paymentReady && ($deliveryReady || $pickupReady);
+$codEnabled = $db ? marketplace_cod_enabled() : false;
+$checkoutReady = ($paymentReady || $codEnabled) && ($deliveryReady || $pickupReady);
 $paymentMethods = marketplace_pakasir_methods();
 $customer = $db ? marketplace_customer($db) : null;
 $savedAddresses = ($db && $customer) ? marketplace_customer_addresses($db, (int)$customer['id']) : [];
@@ -47,6 +48,7 @@ require __DIR__ . '/_header.php';
           data-order-url="<?= e(base_url('store/api/create-order.php')); ?>"
           data-voucher-url="<?= e(base_url('store/api/voucher-check.php')); ?>"
           data-point-value="<?= e((string)$pointValue); ?>" data-point-min="<?= (int)$pointMinRedeem; ?>" data-point-available="<?= (int)$pointsAvailable; ?>"
+          data-cod-enabled="<?= $codEnabled ? '1' : '0'; ?>"
           data-ready="<?= $checkoutReady ? '1' : '0'; ?>">
         <?= CSRF::input(); ?>
         <input type="hidden" name="checkout_key" id="checkoutKey" value="<?= e(bin2hex(random_bytes(16))); ?>">
@@ -150,7 +152,16 @@ require __DIR__ . '/_header.php';
                         </select></span>
                         <i class="bi bi-check-circle-fill payment-check"></i>
                     </label>
+                    <?php if (!empty($codEnabled)): ?>
+                    <label class="payment-method-card payment-method-cod" data-cod-card hidden>
+                        <input type="radio" name="payment_method" value="cod" disabled>
+                        <span class="payment-icon"><i class="bi bi-cash-coin"></i></span>
+                        <span><b>Bayar di Tempat (COD)</b><small>Bayar tunai saat ambil di toko / pesanan diterima kurir toko</small></span>
+                        <i class="bi bi-check-circle-fill payment-check"></i>
+                    </label>
+                    <?php endif; ?>
                 </div>
+                <p class="checkout-cod-note" data-cod-note hidden><i class="bi bi-info-circle"></i> COD hanya untuk <b>Ambil di Toko</b> atau <b>Kurir Toko</b>. Untuk ekspedisi, gunakan QRIS / Virtual Account.</p>
             </section>
         </div>
 

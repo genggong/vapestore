@@ -232,7 +232,10 @@ function marketplace_store_courier_assign(PDO $db,int $orderId,int $courierId,?i
     marketplace_store_courier_install($db);
     $o=$db->prepare("SELECT * FROM online_orders WHERE id=? LIMIT 1");$o->execute([$orderId]);$order=$o->fetch();
     if(!$order) throw new RuntimeException('Pesanan tidak ditemukan.');
-    if((string)$order['payment_status']!=='paid') throw new RuntimeException('Pesanan harus sudah dibayar sebelum ditugaskan ke kurir toko.');
+    $isCodOrder = strtolower((string)($order['payment_method'] ?? '')) === 'cod';
+    if((string)$order['payment_status']!=='paid' && !($isCodOrder && (string)$order['payment_status']==='unpaid')) {
+        throw new RuntimeException('Pesanan harus sudah dibayar sebelum ditugaskan ke kurir toko.');
+    }
     if((string)$order['courier_code']!=='store') throw new RuntimeException('Pesanan ini tidak memilih layanan Kurir Toko.');
     if(in_array((string)$order['order_status'],['completed','cancelled','expired'],true)) throw new RuntimeException('Status pesanan tidak dapat ditugaskan.');
     $courier=marketplace_store_courier_get($db,$courierId);
@@ -255,6 +258,10 @@ function marketplace_store_courier_assign(PDO $db,int $orderId,int $courierId,?i
     marketplace_store_courier_add_event($db,$assignmentId,$orderId,$courierId,'assigned','Paket ditugaskan','Ditugaskan kepada '.$courier['name'].'.');
     if(function_exists('marketplace_add_event')) marketplace_add_event($db,$orderId,'courier_assigned','Kurir toko ditugaskan','Kurir: '.$courier['name']);
     if(function_exists('marketplace_v15_log')) { try{marketplace_v15_log($db,'store_courier_assign','online_order',$orderId,'Kurir '.$courier['name'].' ditugaskan ke '.$order['order_number']);}catch(Throwable $ignore){} }
+    // V17.0.34 — kabari kurir lewat WhatsApp (Fonnte) setelah penugasan tersimpan.
+    if(function_exists('marketplace_notify_store_courier')) {
+        try { marketplace_notify_store_courier($db,$orderId,$courierId); } catch(Throwable $e) {}
+    }
     return marketplace_store_courier_assignment($db,$orderId) ?: [];
 }
 

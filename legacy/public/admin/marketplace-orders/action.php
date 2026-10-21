@@ -70,6 +70,15 @@ try {
         marketplace_add_event($db,$id,'completed','Pesanan selesai','Pesanan telah diselesaikan.');
         Auth::log('marketplace_order_completed','Marketplace '.$order['order_number']);
         flash('success','Pesanan selesai.');
+    } elseif ($action === 'cod_paid') {
+        // V17.0.34 — uang tunai COD diterima (di toko / oleh kurir toko).
+        if (strtolower((string)$order['payment_method']) !== 'cod') throw new RuntimeException('Pesanan ini bukan COD.');
+        if ((string)$order['payment_status'] === 'paid') throw new RuntimeException('Pesanan sudah lunas.');
+        $db->prepare("UPDATE online_orders SET payment_status='paid',paid_at=NOW(),updated_at=NOW() WHERE id=?")->execute([$id]);
+        marketplace_add_event($db,$id,'paid','Pembayaran COD diterima','Uang tunai diterima '.(string)($order['courier_code']==='pickup'?'di toko':'oleh kurir toko').'.');
+        if (function_exists('marketplace_award_customer_points')) { try { marketplace_award_customer_points($db,$id); } catch (Throwable $e) {} }
+        Auth::log('marketplace_cod_paid','Marketplace '.$order['order_number']);
+        flash('success','Pembayaran COD ditandai lunas.');
     } elseif ($action === 'pickup_ready') {
         marketplace_store_pickup_mark_ready($db,$id);
         Auth::log('marketplace_store_pickup_ready','Marketplace '.$order['order_number']);
@@ -79,6 +88,12 @@ try {
         $recipient=trim((string)($_POST['pickup_recipient']??''));
         $note=trim((string)($_POST['pickup_note']??''));
         marketplace_store_pickup_complete($db,$id,$code,$recipient,$note);
+        // V17.0.34 — COD: uang tunai sudah diterima saat serah terima di toko.
+        if (strtolower((string)$order['payment_method']) === 'cod' && (string)$order['payment_status'] !== 'paid') {
+            $db->prepare("UPDATE online_orders SET payment_status='paid',paid_at=NOW(),updated_at=NOW() WHERE id=?")->execute([$id]);
+            marketplace_add_event($db,$id,'paid','Pembayaran COD diterima','Uang tunai diterima di toko saat pengambilan.');
+            if (function_exists('marketplace_award_customer_points')) { try { marketplace_award_customer_points($db,$id); } catch (Throwable $e) {} }
+        }
         Auth::log('marketplace_store_pickup_completed','Marketplace '.$order['order_number'].' / '.$recipient);
         flash('success','Pesanan berhasil diserahkan dan diselesaikan.');
     } elseif ($action === 'cancel') {

@@ -41,6 +41,16 @@ require __DIR__ . '/_header.php';
                         <div class="payment-success-panel"><span><i class="bi bi-check2-circle"></i></span><div><h3>Pembayaran berhasil</h3><p>Pesanan Anda sudah masuk antrean proses toko.</p></div></div>
                     <?php elseif (in_array($order['payment_status'], ['expired','failed','cancelled'], true)): ?>
                         <div class="payment-expired-panel"><span><i class="bi bi-x-circle"></i></span><div><h3>Pembayaran tidak aktif</h3><p>Pesanan telah dibatalkan dan stok produk dikembalikan.</p></div></div>
+                    <?php elseif (strtolower((string) $order['payment_method']) === 'cod' && $order['payment_status'] === 'unpaid'): ?>
+                        <div class="payment-amount-panel">
+                            <span>Bayar tunai saat <?= strtolower((string) $order['courier_code']) === 'pickup' ? 'ambil di toko' : 'pesanan diterima kurir toko'; ?></span>
+                            <strong><?= rupiah((float) $order['grand_total']); ?></strong>
+                            <small>Bayar di Tempat (COD) — tidak perlu transfer sekarang.</small>
+                        </div>
+                        <div class="payment-auto-note"><i class="bi bi-cash-coin"></i><span>Siapkan uang tunai sejumlah tagihan. Pesanan diproses setelah dikonfirmasi admin.</span></div>
+                        <?php if (!empty($order['pickup_code'])): ?>
+                            <div class="pickup-code-customer"><small>KODE PENGAMBILAN</small><strong><?= e($order['pickup_code']); ?></strong><span>Tunjukkan kode ini di toko saat membayar.</span></div>
+                        <?php endif; ?>
                     <?php elseif ($order['payment_status'] === 'error'): ?>
                         <div class="payment-error-panel"><span><i class="bi bi-arrow-repeat"></i></span><div><h3>Instruksi pembayaran belum terbentuk</h3><p>Pesanan sudah tersimpan. Coba buat ulang instruksi pembayaran dengan tombol di bawah.</p></div></div>
                         <button class="btn-primary-store payment-retry-btn" type="button" id="retryPaymentBtn"><i class="bi bi-arrow-clockwise"></i> Coba Pembayaran Lagi</button>
@@ -77,7 +87,7 @@ require __DIR__ . '/_header.php';
                     <div class="checkout-box-title"><span><i class="bi bi-shop-window"></i></span><div><small>CLICK & COLLECT</small><h2>Ambil di Toko</h2></div></div>
                     <div class="order-address-block"><i class="bi bi-shop"></i><div><b><?= e($order['branch_name'] ?: 'Toko Pengambilan'); ?></b><p><?= nl2br(e($order['branch_address'] ?: $order['address'])); ?></p><?php if(!empty($order['branch_phone'])): ?><small><i class="bi bi-telephone"></i> <?= e($order['branch_phone']); ?></small><?php endif; ?></div></div>
                     <div class="shipping-detail-grid"><div><span>Status</span><b><?= e(marketplace_store_pickup_status_label($order)); ?></b></div><div><span>Jam Pengambilan</span><b><?= e(marketplace_store_pickup_config()['hours']); ?></b></div><div><span>Ongkir</span><b>Rp 0</b></div><div><span>Berat Pesanan</span><b><?= e(number_format((int)$order['total_weight_gram'],0,',','.')); ?> gr</b></div></div>
-                    <?php if($order['payment_status']==='paid' && !empty($order['pickup_code'])): ?><div class="pickup-code-customer"><small>KODE PENGAMBILAN</small><strong><?= e($order['pickup_code']); ?></strong><p>Tunjukkan kode ini kepada petugas toko saat mengambil pesanan. Jangan berikan kode sebelum Anda berada di toko.</p></div><?php endif; ?>
+                    <?php if(in_array((string)$order['payment_status'],['paid','unpaid'],true) && !empty($order['pickup_code'])): ?><div class="pickup-code-customer"><small>KODE PENGAMBILAN</small><strong><?= e($order['pickup_code']); ?></strong><p>Tunjukkan kode ini kepada petugas toko saat mengambil pesanan. Jangan berikan kode sebelum Anda berada di toko.</p></div><?php endif; ?>
                     <div class="payment-auto-note" style="margin-top:12px"><i class="bi bi-info-circle"></i><span><?= e(marketplace_store_pickup_config()['instructions']); ?></span></div>
                     <?php if((string)$order['fulfillment_status']!=='ready_pickup' && (string)$order['order_status']!=='completed'): ?><div class="payment-auto-note" style="margin-top:10px"><i class="bi bi-hourglass-split"></i><span>Tunggu status <b>Siap Diambil</b> sebelum datang ke toko.</span></div><?php endif; ?>
                     <?php if((string)$order['order_status']==='completed'): ?><div class="payment-success-panel" style="margin-top:12px"><span><i class="bi bi-check2-circle"></i></span><div><h3>Pesanan sudah diambil</h3><p><?= !empty($order['pickup_recipient'])?'Diserahkan kepada '.e($order['pickup_recipient']).'.':'Pengambilan selesai.'; ?></p></div></div><?php endif; ?>

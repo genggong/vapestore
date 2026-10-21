@@ -14,6 +14,10 @@ $order = marketplace_expire_if_needed($db, $order);
 $items = marketplace_order_items($db, $id);
 $events = marketplace_order_events($db, $id);
 $paymentLabel = marketplace_pakasir_methods()[$order['payment_method']] ?? strtoupper((string)$order['payment_method']);
+// V17.0.34 — COD: pembayaran tunai, belum lunas sampai uang diterima.
+if (strtolower((string)$order['payment_method']) === 'cod') {
+    $paymentLabel = 'COD (Bayar di Tempat)';
+}
 $deliveryConfig = marketplace_delivery_config();
 $storeCourierConfig = marketplace_store_courier_config();
 $storePickupConfig = marketplace_store_pickup_config();
@@ -52,7 +56,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
                     <?php if((string)$order['courier_code']==='store'): ?><div><small>Kurir Toko</small><b><?= e($storeCourierAssignment['courier_name'] ?? 'Belum ditugaskan'); ?></b><?php if($storeCourierAssignment): ?><br><small><?= e(marketplace_store_courier_status_label((string)$storeCourierAssignment['status'])); ?></small><?php endif; ?></div><?php endif; ?>
                     <?php if((string)$order['courier_code']==='pickup'): ?>
                     <div><small>Status Pengambilan</small><b><?= e(marketplace_store_pickup_status_label($order)); ?></b></div>
-                    <div><small>Kode Pengambilan</small><b><?= $order['payment_status']==='paid' ? e($order['pickup_code'] ?: '-') : 'Tampil setelah lunas'; ?></b></div>
+                    <div><small>Kode Pengambilan</small><b><?= in_array($order['payment_status'],['paid','unpaid'],true) ? e($order['pickup_code'] ?: '-') : 'Tampil setelah lunas'; ?></b></div>
                     <?php else: ?>
                     <div><small>Resi</small><b><?= e($order['awb_number'] ?: 'Belum tersedia'); ?></b></div>
                     <div><small>Shipping Delivery</small><b><?= e($order['delivery_order_no'] ?: 'Belum dibuat'); ?></b></div>
@@ -92,10 +96,13 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
             <section class="premium-card">
                 <div class="card-head"><div><h3>Proses Pesanan</h3><p>Urutan fulfillment marketplace.</p></div></div>
                 <div class="market-order-actions">
+                    <?php if (strtolower((string)$order['payment_method'])==='cod' && $order['payment_status']!=='paid' && !in_array($order['order_status'],['cancelled','expired'],true)): ?>
+                    <form method="post" action="<?= legacy_base_url('admin/marketplace-orders/action.php'); ?>" onsubmit="return confirm('Tandai pembayaran COD sudah diterima tunai?')"><?= CSRF::input(); ?><input type="hidden" name="id" value="<?= $id; ?>"><input type="hidden" name="action" value="cod_paid"><button class="btn-soft" type="submit"><i class="bi bi-cash-coin"></i> Tandai Lunas (COD) — <?= rupiah((float)$order['grand_total']); ?></button></form>
+                    <?php endif; ?>
                     <?php if ($order['payment_status']==='paid' && $order['order_status']==='paid'): ?>
                     <form method="post" action="<?= base_url('admin/marketplace-orders/action.php'); ?>"><?= CSRF::input(); ?><input type="hidden" name="id" value="<?= $id; ?>"><input type="hidden" name="action" value="processing"><button class="btn-premium" style="width:100%;"><i class="bi bi-box-seam"></i> Mulai Proses Pesanan</button></form>
                     <?php endif; ?>
-                    <?php if ((string)$order['courier_code']==='store' && $order['payment_status']==='paid' && !in_array($order['order_status'],['completed','cancelled','expired'],true)): ?>
+                    <?php if ((string)$order['courier_code']==='store' && in_array((string)$order['payment_status'],['paid','unpaid'],true) && !in_array($order['order_status'],['completed','cancelled','expired'],true)): ?>
                         <div style="padding:14px;border:1px solid #ddd6fe;border-radius:16px;background:#faf5ff;display:grid;gap:10px">
                             <b><i class="bi bi-bicycle"></i> Kurir Toko</b>
                             <?php if($storeCourierAssignment): ?><small>Ditugaskan ke <b><?= e($storeCourierAssignment['courier_name']); ?></b> • <?= e(marketplace_store_courier_status_label((string)$storeCourierAssignment['status'])); ?></small><?php else: ?><small>Belum ada kurir yang ditugaskan.</small><?php endif; ?>
@@ -108,7 +115,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
                             <a class="btn-soft" href="<?= base_url('admin/marketplace-courier-deliveries/index.php'); ?>"><i class="bi bi-activity"></i> Monitor Pengiriman</a>
                         </div>
                     <?php endif; ?>
-                    <?php if ((string)$order['courier_code']==='pickup' && $order['payment_status']==='paid' && !in_array($order['order_status'],['cancelled','expired'],true)): ?>
+                    <?php if ((string)$order['courier_code']==='pickup' && in_array((string)$order['payment_status'],['paid','unpaid'],true) && !in_array($order['order_status'],['cancelled','expired'],true)): ?>
                         <div style="padding:14px;border:1px solid #d8b4fe;border-radius:16px;background:#faf5ff;display:grid;gap:10px">
                             <b><i class="bi bi-shop-window"></i> Ambil di Toko</b>
                             <small>Toko: <b><?= e($order['branch_name'] ?: ('Cabang #'.$order['branch_id'])); ?></b></small>

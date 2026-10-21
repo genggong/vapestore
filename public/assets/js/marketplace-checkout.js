@@ -220,6 +220,7 @@
         $('#shippingCostValue').value = '0';
         if (fulfillmentSummary) fulfillmentSummary.innerHTML = '<i class="bi bi-shop-window"></i><span>Pilih <b>toko pengambilan</b></span>';
         updateTotals();
+        syncCodOption();
         await loadPickupBranches();
       } else {
         setDeliveryFieldsEnabled(true);
@@ -237,6 +238,36 @@
         if (saved) setTimeout(() => saved.click(), 30);
         else if (state.destination?.id) loadShipping();
         else { clearShipping(); if (provinceSelect && provinceSelect.options.length <= 1) loadRegion('province',0,provinceSelect,'Pilih Provinsi'); }
+        syncCodOption();
+      }
+    }
+
+    // V17.0.34 — COD hanya tampil untuk Ambil di Toko / Kurir Toko.
+    const codCard = $('.payment-method-cod', form);
+    const codNote = $('[data-cod-note]', form);
+
+    function codAllowedNow() {
+      if (!codCard) return false;
+      const courier = ($('#courierCode')?.value || '').toLowerCase();
+      return state.fulfillment === 'pickup' || courier === 'store' || courier === 'pickup';
+    }
+
+    function syncCodOption() {
+      if (!codCard) return;
+      const ok = codAllowedNow();
+      codCard.hidden = !ok;
+      codCard.classList.toggle('disabled', !ok);
+      const radio = $('input[name="payment_method"][value="cod"]', form);
+      const selected = $('input[name="payment_method"]:checked', form);
+      if (radio) radio.disabled = !ok;
+      if (codNote) codNote.hidden = ok;
+      if (!ok && radio && (radio.checked || selected?.value === 'cod')) {
+        radio.checked = false;
+        const fallback = $('input[name="payment_method"][value="qris"]', form);
+        if (fallback) {
+          fallback.checked = true;
+          $$('.payment-method-card', form).forEach(c => c.classList.toggle('active', c === fallback.closest('.payment-method-card')));
+        }
       }
     }
 
@@ -254,6 +285,7 @@
       $$('.checkout-courier', shippingBox).forEach(el => el.classList.toggle('active', el.dataset.key === `${option.code}|${option.service}|${option.cost}`));
       $$('input[type="radio"]', shippingBox).forEach(radio => { radio.checked = radio.closest('.checkout-courier')?.classList.contains('active') || false; });
       updateTotals();
+      syncCodOption();
     };
 
     const renderShipping = options => {
