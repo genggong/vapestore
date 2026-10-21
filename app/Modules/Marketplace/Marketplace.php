@@ -418,6 +418,35 @@ function marketplace_ensure_secret(PDO $db, string $key): string
     return $current;
 }
 
+/**
+ * V17.0.29 — cabang pengirim untuk pesanan online (bukan pickup).
+ * Utamakan cabang marketplace (setting), lalu cabang aktif lain yang mampu
+ * memenuhi SELURUH isi keranjang. Kalau tidak ada yang mampu, kembalikan cabang utama
+ * supaya validasi stok tetap memberi pesan error yang jelas.
+ */
+function marketplace_delivery_branch(PDO $db, array $rawItems = [], int $preferred = 0): int
+{
+    $preferred = $preferred > 0 ? $preferred : marketplace_branch_id($db);
+    if (!$rawItems) return $preferred;
+    $ids = [$preferred];
+    try {
+        $rows = $db->query("SELECT id FROM branches WHERE is_active = 1 ORDER BY is_main DESC, id ASC")->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($rows ?: [] as $id) {
+            $id = (int) $id;
+            if ($id > 0 && !in_array($id, $ids, true)) $ids[] = $id;
+        }
+    } catch (Throwable $e) {}
+    foreach ($ids as $id) {
+        try {
+            marketplace_cart($db, $rawItems, $id);
+            return (int) $id;
+        } catch (Throwable $e) {
+            continue;
+        }
+    }
+    return $preferred;
+}
+
 function marketplace_branch_id(PDO $db): int
 {
     marketplace_install($db);
@@ -1130,7 +1159,8 @@ function marketplace_create_order(PDO $db, array $payload): array
         if (!$pickupBranch) throw new RuntimeException('Toko pengambilan tidak tersedia atau stok keranjang tidak lengkap di cabang tersebut. Pilih toko kembali.');
         $branchId = (int)$pickupBranch['branch_id'];
     } else {
-        $branchId = marketplace_branch_id($db);
+        // V17.0.29 — pilih cabang pengirim yang bisa memenuhi seluruh keranjang.
+        $branchId = marketplace_delivery_branch($db, $rawItems);
     }
     $cart = marketplace_cart($db, $rawItems, $branchId);
 
@@ -1169,7 +1199,7 @@ function marketplace_create_order(PDO $db, array $payload): array
             if (!marketplace_store_courier_validate_destination($payload, $destinationId)) {
                 throw new RuntimeException('Alamat tidak termasuk area layanan Kurir Toko atau data wilayah berubah. Silakan pilih wilayah kembali.');
             }
-            $selected = marketplace_store_courier_option($province,$city,$district,$subdistrict,$destinationId);
+            $selected = marketplace_store_courier_option($province,$city,$district,$subdistrict,$destinationId,$branchId);
             if (!$selected) throw new RuntimeException('Kurir Toko tidak tersedia untuk alamat ini.');
             $postedCost = isset($payload['shipping_cost']) ? (float)$payload['shipping_cost'] : null;
             if ($postedCost !== null && abs($postedCost - (float)$selected['cost']) > 0.01) throw new RuntimeException('Tarif Kurir Toko berubah. Silakan hitung ongkir kembali.');

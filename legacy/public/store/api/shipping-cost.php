@@ -21,12 +21,21 @@ try {
     } catch (Throwable $shippingError) {
         $rajaError = $shippingError->getMessage();
     }
+    // V17.0.29 — ongkir Kurir Toko mengikuti cabang pengirim yang memenuhi keranjang.
+    $senderBranchId = marketplace_delivery_branch($db, is_array($payload['items'] ?? null) ? $payload['items'] : []);
+    $senderBranchName = '';
+    try {
+        $bs = $db->prepare("SELECT name FROM branches WHERE id=? LIMIT 1");
+        $bs->execute([$senderBranchId]);
+        $senderBranchName = (string) ($bs->fetchColumn() ?: '');
+    } catch (Throwable $e) {}
     $storeOption = marketplace_store_courier_option(
         trim((string)($payload['province'] ?? '')),
         trim((string)($payload['city'] ?? '')),
         trim((string)($payload['district'] ?? '')),
         trim((string)($payload['subdistrict'] ?? '')),
-        $destinationId
+        $destinationId,
+        $senderBranchId
     );
     if ($storeOption) array_unshift($options, $storeOption);
     if (!$options) throw new RuntimeException($rajaError !== '' ? $rajaError : 'Tidak ada layanan pengiriman untuk rute ini. Coba tujuan/kurir lain.');
@@ -34,6 +43,8 @@ try {
         'success' => true,
         'subtotal' => $cart['subtotal'],
         'weight_gram' => $cart['weight_gram'],
+        'sender_branch_id' => $senderBranchId,
+        'sender_branch_name' => $senderBranchName,
         'data' => $options,
     ]);
 } catch (Throwable $e) {

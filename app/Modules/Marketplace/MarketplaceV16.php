@@ -48,6 +48,7 @@ function marketplace_v16_install(PDO $db): void
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS marketplace_store_courier_rates (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            branch_id BIGINT NOT NULL DEFAULT 0,
             destination_id BIGINT NULL,
             province_id BIGINT NULL,
             city_id BIGINT NULL,
@@ -64,11 +65,30 @@ function marketplace_v16_install(PDO $db): void
             sort_order INT NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uniq_mp_store_courier_destination(destination_id),
+            UNIQUE KEY uniq_mp_store_courier_dest_branch(destination_id,branch_id),
             INDEX idx_mp_store_courier_subdistrict(subdistrict),
-            INDEX idx_mp_store_courier_active(is_active,sort_order)
+            INDEX idx_mp_store_courier_active(is_active,sort_order),
+            INDEX idx_mp_store_courier_branch(branch_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     } catch(Throwable $e) {}
+
+    // V17.0.29 — tarif Kurir Toko bisa disetel per cabang pengirim (branch_id=0 = semua cabang).
+    try {
+        if (marketplace_v16_table_exists($db, 'marketplace_store_courier_rates')) {
+            if (!marketplace_v16_column_exists($db, 'marketplace_store_courier_rates', 'branch_id')) {
+                $db->exec("ALTER TABLE marketplace_store_courier_rates ADD COLUMN branch_id BIGINT NOT NULL DEFAULT 0 AFTER id");
+            }
+            if (marketplace_v16_index_exists($db, 'marketplace_store_courier_rates', 'uniq_mp_store_courier_destination')) {
+                $db->exec("ALTER TABLE marketplace_store_courier_rates DROP INDEX uniq_mp_store_courier_destination");
+            }
+            if (!marketplace_v16_index_exists($db, 'marketplace_store_courier_rates', 'uniq_mp_store_courier_dest_branch')) {
+                $db->exec("ALTER TABLE marketplace_store_courier_rates ADD UNIQUE KEY uniq_mp_store_courier_dest_branch(destination_id,branch_id)");
+            }
+            if (!marketplace_v16_index_exists($db, 'marketplace_store_courier_rates', 'idx_mp_store_courier_branch')) {
+                $db->exec("ALTER TABLE marketplace_store_courier_rates ADD INDEX idx_mp_store_courier_branch(branch_id)");
+            }
+        }
+    } catch (Throwable $e) {}
 
     // Transaksi POS dapat menyimpan varian yang dipilih kasir.
     try {
@@ -175,17 +195,21 @@ function marketplace_v16_norm(string $value): string
     return trim(preg_replace('/\s+/u',' ',$value)?:'');
 }
 
-function marketplace_v16_store_courier_rate(PDO $db,int $destinationId,string $province,string $city,string $district,string $subdistrict): ?array
+function marketplace_v16_store_courier_rate(PDO $db,int $destinationId,string $province,string $city,string $district,string $subdistrict,int $branchId=0): ?array
 {
     marketplace_v16_install($db);
+    // V17.0.29 — cabang pengirim lebih diutamakan daripada tarif umum (branch_id=0).
+    $branchId=max(0,$branchId);
+    $scope=$branchId>0?' AND branch_id IN ('.(int)$branchId.',0)':' AND branch_id=0';
+    $pref=$branchId>0?' ORDER BY branch_id DESC, sort_order ASC, id DESC':' ORDER BY sort_order ASC, id DESC';
     try {
         if($destinationId>0){
-            $s=$db->prepare("SELECT * FROM marketplace_store_courier_rates WHERE is_active=1 AND destination_id=? ORDER BY sort_order ASC,id DESC LIMIT 1");
+            $s=$db->prepare("SELECT * FROM marketplace_store_courier_rates WHERE is_active=1 AND destination_id=?".$scope.$pref." LIMIT 1");
             $s->execute([$destinationId]);$r=$s->fetch();if($r)return $r;
         }
         $wanted=[marketplace_v16_norm($province),marketplace_v16_norm($city),marketplace_v16_norm($district),marketplace_v16_norm($subdistrict)];
         if($wanted[3]==='') return null;
-        $s=$db->query("SELECT * FROM marketplace_store_courier_rates WHERE is_active=1 ORDER BY sort_order ASC,id DESC");
+        $s=$db->query("SELECT * FROM marketplace_store_courier_rates WHERE is_active=1".$scope.$pref);
         foreach($s->fetchAll()?:[] as $r){
             if(marketplace_v16_norm((string)$r['subdistrict'])!==$wanted[3]) continue;
             if(trim((string)$r['district'])!=='' && marketplace_v16_norm((string)$r['district'])!==$wanted[2]) continue;

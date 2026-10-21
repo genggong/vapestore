@@ -390,18 +390,20 @@ function storefront_products(array $options = []): array
 
         $variantJoin = '';
         $variantSelect = '0 AS variant_count';
-        $stockSelect = 'COALESCE(pbs.stock, CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END, 0) AS stock_total';
+        $stockSelect = 'COALESCE((SELECT SUM(pbs_all.stock) FROM product_branch_stocks pbs_all JOIN branches b_all ON b_all.id = pbs_all.branch_id AND b_all.is_active = 1 WHERE pbs_all.product_id = p.id), CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END, 0) AS stock_total';
         if ($hasVariants && $hasVariantStocks) {
+            // V17.0.29 — stok varian dijumlahkan dari semua cabang aktif.
             $variantJoin = "LEFT JOIN (
-                SELECT v.product_id,COUNT(*) AS variant_count,SUM(COALESCE(vs.stock,0)) AS variant_stock
+                SELECT v.product_id,COUNT(*) AS variant_count,
+                       SUM(CASE WHEN vb.id IS NULL THEN 0 ELSE COALESCE(vs.stock,0) END) AS variant_stock
                 FROM marketplace_product_variants v
-                LEFT JOIN marketplace_product_variant_stocks vs ON vs.variant_id=v.id AND vs.branch_id=?
+                LEFT JOIN marketplace_product_variant_stocks vs ON vs.variant_id=v.id
+                LEFT JOIN branches vb ON vb.id=vs.branch_id AND vb.is_active=1
                 WHERE v.is_active=1
                 GROUP BY v.product_id
             ) va ON va.product_id=p.id";
             $variantSelect = 'COALESCE(va.variant_count,0) AS variant_count';
-            $stockSelect = 'CASE WHEN COALESCE(va.variant_count,0)>0 THEN COALESCE(va.variant_stock,0) ELSE COALESCE(pbs.stock, CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END,0) END AS stock_total';
-            $params[] = $branchId;
+            $stockSelect = 'CASE WHEN COALESCE(va.variant_count,0)>0 THEN COALESCE(va.variant_stock,0) ELSE COALESCE((SELECT SUM(pbs_all.stock) FROM product_branch_stocks pbs_all JOIN branches b_all ON b_all.id = pbs_all.branch_id AND b_all.is_active = 1 WHERE pbs_all.product_id = p.id), CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END,0) END AS stock_total';
         } elseif ($hasVariants) {
             $variantJoin = "LEFT JOIN (
                 SELECT v.product_id,COUNT(*) AS variant_count
@@ -520,6 +522,28 @@ function storefront_effective_stock(array $product): int
     return max(0, (int)($product['stock_total'] ?? $product['stock'] ?? 0));
 }
 
+/**
+ * V17.0.29 — total stok semua varian aktif dari SEMUA cabang aktif.
+ * Dipakai katalog/detail (stok tampil = gabungan cabang), sedangkan pemotongan stok
+ * tetap per cabang saat checkout (marketplace_cart menerima branchId).
+ */
+function storefront_variant_stock_total(int $productId): int
+{
+    $db = storefront_db();
+    if (!$db || $productId <= 0) return 0;
+    try {
+        $s = $db->prepare("SELECT COALESCE(SUM(vs.stock),0)
+                             FROM marketplace_product_variants v
+                             JOIN marketplace_product_variant_stocks vs ON vs.variant_id = v.id
+                             JOIN branches b ON b.id = vs.branch_id AND b.is_active = 1
+                            WHERE v.product_id = ? AND v.is_active = 1");
+        $s->execute([$productId]);
+        return max(0, (int) $s->fetchColumn());
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
 function storefront_product(int $id): ?array
 {
     if ($id <= 0) return null;
@@ -534,7 +558,7 @@ function storefront_product(int $id): ?array
     // Fetch the core POS product first. V15 extras must never make a valid POS
     // product look "missing" just because an additive migration is incomplete.
     try {
-        $stmt = $db->prepare("SELECT p.id,p.category_id,p.product_code,p.barcode,p.name,p.description,p.image,p.selling_price,p.stock,p.unit,{$weightExpr} AS weight_gram,p.created_at,c.name category_name,c.slug category_slug,c.icon category_icon,COALESCE(pbs.stock,CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END,0) stock_total FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN branches b ON b.id=? LEFT JOIN product_branch_stocks pbs ON pbs.product_id=p.id AND pbs.branch_id=b.id WHERE p.id=? AND p.is_active=1 LIMIT 1");
+        $stmt = $db->prepare("SELECT p.id,p.category_id,p.product_code,p.barcode,p.name,p.description,p.image,p.selling_price,p.stock,p.unit,{$weightExpr} AS weight_gram,p.created_at,c.name category_name,c.slug category_slug,c.icon category_icon,COALESCE((SELECT SUM(pbs_all.stock) FROM product_branch_stocks pbs_all JOIN branches b_all ON b_all.id = pbs_all.branch_id AND b_all.is_active = 1 WHERE pbs_all.product_id = p.id),CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END,0) stock_total FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN branches b ON b.id=? LEFT JOIN product_branch_stocks pbs ON pbs.product_id=p.id AND pbs.branch_id=b.id WHERE p.id=? AND p.is_active=1 LIMIT 1");
         $stmt->execute([$branchId, $id]);
         $row = $stmt->fetch() ?: null;
     } catch (Throwable $e) {
@@ -578,7 +602,7 @@ function storefront_product(int $id): ?array
             $vc = $db->prepare("SELECT COUNT(*) FROM marketplace_product_variants WHERE product_id=? AND is_active=1");
             $vc->execute([(int) $row['id']]);
             $row['variant_count'] = (int) $vc->fetchColumn();
-            if($row['variant_count']>0) $row['stock_total']=marketplace_v16_product_variant_stock_total($db,(int)$row['id'],$branchId,true);
+            if($row['variant_count']>0) $row['stock_total']=storefront_variant_stock_total((int)$row['id']);
         } catch (Throwable $e) {}
     }
 
@@ -734,7 +758,28 @@ function storefront_product_gallery(int $productId): array
 }
 function storefront_product_variants(int $productId): array
 {
-    $db=storefront_db();if(!$db)return [];try{$rows=marketplace_v15_variants($db,$productId,marketplace_branch_id($db),true);foreach($rows as &$v){$eff=marketplace_v15_effective_price($db,$productId,(float)$v['selling_price'],(int)$v['id']);$v['original_selling_price']=$eff['normal_price'];$v['selling_price']=$eff['price'];$v['flash_sale']=$eff['flash'];}unset($v);return $rows;}catch(Throwable $e){return [];}
+    $db=storefront_db();if(!$db)return [];
+    try{
+        $rows=marketplace_v15_variants($db,$productId,marketplace_branch_id($db),true);
+        // V17.0.29 — stok tiap varian = jumlah semua cabang aktif (pemotongan tetap per cabang saat checkout).
+        $agg=[];
+        try{
+            $s=$db->prepare("SELECT vs.variant_id,COALESCE(SUM(vs.stock),0) AS stock_all
+                               FROM marketplace_product_variant_stocks vs
+                               JOIN marketplace_product_variants v ON v.id=vs.variant_id AND v.product_id=?
+                               JOIN branches b ON b.id=vs.branch_id AND b.is_active=1
+                              GROUP BY vs.variant_id");
+            $s->execute([$productId]);
+            foreach($s->fetchAll()?:[] as $r){$agg[(int)$r['variant_id']]=(int)$r['stock_all'];}
+        }catch(Throwable $e){}
+        foreach($rows as &$v){
+            if(array_key_exists((int)$v['id'],$agg))$v['stock']=$agg[(int)$v['id']];
+            $eff=marketplace_v15_effective_price($db,$productId,(float)$v['selling_price'],(int)$v['id']);
+            $v['original_selling_price']=$eff['normal_price'];$v['selling_price']=$eff['price'];$v['flash_sale']=$eff['flash'];
+        }
+        unset($v);
+        return $rows;
+    }catch(Throwable $e){return [];}
 }
 function storefront_flash_products(int $limit=8): array
 {

@@ -137,7 +137,7 @@ function marketplace_store_courier_eligible_region(string $province, string $cit
     return $originDistrict !== '' && $district === $originDistrict;
 }
 
-function marketplace_store_courier_option(string $province, string $city, string $district, string $subdistrict='', int $destinationId=0): ?array
+function marketplace_store_courier_option(string $province, string $city, string $district, string $subdistrict='', int $destinationId=0, int $branchId=0): ?array
 {
     $cfg = marketplace_store_courier_config();
     if (!$cfg['enabled'] || !marketplace_store_courier_eligible_region($province,$city,$district)) return null;
@@ -146,7 +146,7 @@ function marketplace_store_courier_option(string $province, string $city, string
         if(!marketplace_store_courier_active($db,marketplace_branch_id($db))) return null;
         $rate=null;
         if(($cfg['rate_mode']??'flat')==='subdistrict'){
-            $rate=marketplace_v16_store_courier_rate($db,$destinationId,$province,$city,$district,$subdistrict);
+            $rate=marketplace_v16_store_courier_rate($db,$destinationId,$province,$city,$district,$subdistrict,$branchId);
             if(!$rate) return null;
         }
         $fee=$rate?max(0,(float)$rate['fee']):(float)$cfg['fee'];
@@ -178,7 +178,7 @@ function marketplace_store_courier_validate_destination(array $payload, int $des
         $cfg=marketplace_store_courier_config();
         if(($cfg['rate_mode']??'flat')==='subdistrict'){
             $db=Database::connect();
-            return marketplace_v16_store_courier_rate($db,$destinationId,$province,$city,$district,$subdistrict)!==null;
+            return marketplace_v16_store_courier_rate($db,$destinationId,$province,$city,$district,$subdistrict,$branchId)!==null;
         }
         return true;
     } catch (Throwable $e) {
