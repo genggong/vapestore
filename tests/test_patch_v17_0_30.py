@@ -82,7 +82,7 @@ class TestNotifikasiWa(unittest.TestCase):
     def test_target_cabang_dan_gateway(self):
         s = read('legacy/app/Modules/Marketplace/Marketplace.php')
         self.assertIn('SELECT phone FROM branches WHERE id=?', s)
-        self.assertIn('marketplace_wa_send_text(', s)
+        self.assertIn('wa_send_fonnte(', s)
         self.assertIn('wa_send_fonnte(', s, 'harus ada fallback Fonnte')
 
     def test_pengaturan_tampil_di_halaman(self):
