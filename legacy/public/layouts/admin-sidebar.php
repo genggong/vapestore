@@ -22,6 +22,20 @@ function menu_link(string $permission, string $url, string $icon, string $label,
     echo '<i class="bi ' . e($icon) . '"></i><span>' . e($label) . '</span>';
     echo '</a>';
 }
+
+// V17.0.33 — pemilih cabang aktif untuk admin/owner (berlaku di semua halaman: POS, transaksi, stok, laporan).
+$sidebarBranches = [];
+$sidebarBranch = null;
+try {
+    require_once __DIR__ . '/../admin/branches/_helpers.php';
+    if (branch_is_admin()) {
+        $sidebarDb = $sidebarDb ?? Database::connect();
+        $sidebarBranches = branch_all($sidebarDb, true);
+        $sidebarBranch = $sidebarBranches ? branch_current($sidebarDb) : null;
+    }
+} catch (Throwable $e) {
+    $sidebarBranches = [];
+}
 ?>
 
 <aside class="admin-sidebar" id="adminSidebar">
@@ -34,6 +48,21 @@ function menu_link(string $permission, string $url, string $icon, string $label,
             <span><?= e(setting('store_name', 'Toko Demo')); ?></span>
         </div>
     </div>
+
+    <?php if (count($sidebarBranches) > 1 && $sidebarBranch): ?>
+    <form class="sidebar-branch" method="get" action="<?= legacy_base_url('admin/switch-branch.php'); ?>">
+        <label for="sidebarBranchSelect"><i class="bi bi-shop"></i> Cabang aktif</label>
+        <select name="branch_id" id="sidebarBranchSelect" onchange="this.form.submit()">
+            <?php foreach ($sidebarBranches as $sb): ?>
+                <option value="<?= (int) $sb['id']; ?>" <?= (int) $sb['id'] === (int) $sidebarBranch['id'] ? 'selected' : ''; ?>>
+                    <?= e($sb['name']); ?><?= (int) $sb['is_main'] === 1 ? ' (utama)' : ''; ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <input type="hidden" name="redirect" value="<?= e($_SERVER['REQUEST_URI'] ?? ''); ?>">
+        <small>POS, transaksi, stok &amp; laporan mengikuti cabang ini.</small>
+    </form>
+    <?php endif; ?>
 
     <div class="sidebar-scroll">
         <div class="sidebar-menu-title">Operasional</div>

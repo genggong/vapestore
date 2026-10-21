@@ -67,9 +67,13 @@ function shift_generate_code(): string
     return 'SHF-' . date('Ymd-His') . '-' . strtoupper(substr(bin2hex(random_bytes(2)), 0, 4));
 }
 
-function shift_active(PDO $db, ?int $userId = null): ?array
+function shift_active(PDO $db, ?int $userId = null, ?int $branchId = null): ?array
 {
-    if ($userId) {
+    // V17.0.33 — shift ikut cabang aktif.
+    if ($userId && $branchId) {
+        $stmt = $db->prepare("SELECT cs.*, u.name AS user_name, b.name AS branch_name FROM cashier_shifts cs LEFT JOIN users u ON u.id=cs.user_id LEFT JOIN branches b ON b.id=cs.branch_id WHERE cs.status='open' AND cs.user_id=? AND cs.branch_id=? ORDER BY cs.id DESC LIMIT 1");
+        $stmt->execute([$userId, $branchId]);
+    } elseif ($userId) {
         $stmt = $db->prepare("SELECT cs.*, u.name AS user_name, b.name AS branch_name FROM cashier_shifts cs LEFT JOIN users u ON u.id=cs.user_id LEFT JOIN branches b ON b.id=cs.branch_id WHERE cs.status='open' AND cs.user_id=? ORDER BY cs.id DESC LIMIT 1");
         $stmt->execute([$userId]);
     } else {

@@ -24,7 +24,7 @@ price_install($db);
 $currentBranch = branch_current($db);
 $currentBranchId = (int) $currentBranch['id'];
 shift_ensure_tables($db);
-$activeCashierShift = shift_active($db, (int)Auth::id());
+$activeCashierShift = shift_active($db, (int)Auth::id(), (int)($currentBranch['id'] ?? 0));
 pos_theme_sync_latest_master_to_branch($db, $currentBranchId);
 $branchOptions = branch_is_admin() ? branch_all($db, true) : [];
 $errorMessage = '';
@@ -50,30 +50,25 @@ function pos_theme_column_exists(PDO $db, string $table, string $column): bool
 
 function pos_theme_stock_expr(string $productAlias = 'p', string $branchAlias = 'pbs'): string
 {
-    return "CASE
-        WHEN {$productAlias}.updated_at IS NOT NULL
-             AND ({$branchAlias}.updated_at IS NULL OR {$productAlias}.updated_at > {$branchAlias}.updated_at)
-             AND {$productAlias}.stock > COALESCE({$branchAlias}.stock, 0)
-        THEN {$productAlias}.stock
-        ELSE COALESCE({$branchAlias}.stock, {$productAlias}.stock)
-    END";
+    // V17.0.33 — stok cabang aktif yang menang. Stok master hanya dipakai kalau baris cabang belum ada,
+    // supaya stok cabang yang sudah di-nol-kan tidak "hidup lagi" gara-gara stok pusat lebih besar.
+    return "COALESCE({$branchAlias}.stock, {$productAlias}.stock)";
 }
 
 function pos_theme_min_stock_expr(string $productAlias = 'p', string $branchAlias = 'pbs'): string
 {
-    return "CASE
-        WHEN {$productAlias}.updated_at IS NOT NULL
-             AND ({$branchAlias}.updated_at IS NULL OR {$productAlias}.updated_at > {$branchAlias}.updated_at)
-        THEN {$productAlias}.minimum_stock
-        ELSE COALESCE({$branchAlias}.minimum_stock, {$productAlias}.minimum_stock)
-    END";
+    // V17.0.33 — minimum stok mengikuti baris cabang bila ada.
+    return "COALESCE({$branchAlias}.minimum_stock, {$productAlias}.minimum_stock)";
 }
 
 function pos_theme_sync_latest_master_to_branch(PDO $db, int $branchId): void
 {
-    // Jika stok produk baru saja diupdate dari menu Produk, tapi stok cabang belum ikut,
-    // sinkronkan ke cabang aktif hanya bila products.updated_at lebih baru dari pbs.updated_at.
+    // V17.0.33 — hanya cabang UTAMA yang mengikuti stok master.
+    // Cabang lain punya stok sendiri; kalau ikut master, stok cabang yang sudah di-nol-kan akan terisi lagi.
     if (!pos_theme_table_exists($db, 'product_branch_stocks')) return;
+
+    $mainId = (int) $db->query("SELECT id FROM branches WHERE is_main=1 ORDER BY id ASC LIMIT 1")->fetchColumn();
+    if ($mainId <= 0 || $mainId !== $branchId) return;
 
     $db->prepare("
         INSERT IGNORE INTO product_branch_stocks (branch_id, product_id, stock, minimum_stock, created_at)
@@ -92,7 +87,6 @@ function pos_theme_sync_latest_master_to_branch(PDO $db, int $branchId): void
           AND p.is_active = 1
           AND p.updated_at IS NOT NULL
           AND (pbs.updated_at IS NULL OR p.updated_at > pbs.updated_at)
-          AND p.stock > pbs.stock
     ")->execute([$branchId]);
 }
 
