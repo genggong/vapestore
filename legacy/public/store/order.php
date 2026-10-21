@@ -9,6 +9,17 @@ if ($order && function_exists('marketplace_pickup_expire_if_needed')) $order = m
 $items = $order ? marketplace_order_items($db, (int) $order['id']) : [];
 $events = $order ? marketplace_order_events($db, (int) $order['id']) : [];
 $storeCourierAssignment = ($order && (string)($order['courier_code'] ?? '') === 'store') ? marketplace_store_courier_assignment($db,(int)$order['id']) : null;
+// V17.0.40 — sisa waktu bayar (detik) dihitung di MySQL supaya tidak beda timezone.
+$payLeft = 0;
+if ($order && (string) ($order['payment_status'] ?? '') === 'pending' && $db) {
+    try {
+        $stLeft = $db->prepare("SELECT GREATEST(0, TIMESTAMPDIFF(SECOND, NOW(), COALESCE(payment_expired_at, created_at + INTERVAL ? MINUTE))) FROM online_orders WHERE id=?");
+        $stLeft->execute([function_exists('marketplace_payment_timeout_minutes') ? marketplace_payment_timeout_minutes() : 30, (int) $order['id']]);
+        $payLeft = (int) $stLeft->fetchColumn();
+    } catch (Throwable $e) {
+        $payLeft = 0;
+    }
+}
 $pageTitle = $order ? ('Pesanan ' . $order['order_number']) : 'Pesanan Tidak Ditemukan';
 $activePage = 'order';
 require __DIR__ . '/_header.php';
@@ -85,8 +96,10 @@ require __DIR__ . '/_header.php';
                             <div class="payment-error-panel"><span><i class="bi bi-exclamation-triangle"></i></span><div><h3>Instruksi pembayaran belum tersedia</h3><p>QRIS atau nomor Virtual Account belum terbentuk. Gunakan tombol di bawah untuk membuat ulang instruksi pembayaran.</p></div></div>
                             <button class="btn-primary-store payment-retry-btn" type="button" id="retryPaymentBtn"><i class="bi bi-arrow-clockwise"></i> Buat Ulang Pembayaran</button>
                         <?php endif; ?>
-                        <?php if (!empty($order['payment_expired_at'])): ?>
-                            <div class="payment-expiry"><i class="bi bi-clock-history"></i><span>Selesaikan pembayaran sebelum <b><?= e(date('d M Y H:i', strtotime((string) $order['payment_expired_at']))); ?></b></span></div>
+                        <?php if (!empty($order['payment_expired_at']) && (string) $order['payment_status'] === 'pending'): ?>
+                            <div class="payment-expiry" data-pay-left="<?= (int) $payLeft; ?>"><i class="bi bi-clock-history"></i><span>Selesaikan pembayaran dalam <b data-pay-timer><?= sprintf('%02d:%02d', intdiv((int) $payLeft, 60), ((int) $payLeft) % 60); ?></b> • sebelum <?= e(date('d M Y H:i', strtotime((string) $order['payment_expired_at']))); ?>. Lewat dari itu pesanan <b>otomatis dibatalkan</b> dan stok dikembalikan.</span></div>
+                        <?php elseif (!empty($order['payment_expired_at'])): ?>
+                            <div class="payment-expiry"><i class="bi bi-clock-history"></i><span>Batas pembayaran: <b><?= e(date('d M Y H:i', strtotime((string) $order['payment_expired_at']))); ?></b></span></div>
                         <?php endif; ?>
                         <div class="payment-auto-note"><i class="bi bi-broadcast"></i><span>Status halaman ini diperbarui otomatis setelah pembayaran terkonfirmasi.</span></div>
                     <?php endif; ?>
@@ -168,6 +181,20 @@ require __DIR__ . '/_header.php';
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
         <script src="<?= legacy_base_url('assets/js/marketplace-order.js?v=15.2.0'); ?>"></script>
         <script>
+        (function () {
+          var pay = document.querySelector('[data-pay-left]');
+          if (pay) {
+            var sisa = parseInt(pay.dataset.payLeft, 10) || 0;
+            var timer = pay.querySelector('[data-pay-timer]');
+            (function tick() {
+              if (!timer) return;
+              if (sisa <= 0) { timer.textContent = '00:00'; setTimeout(function () { location.reload(); }, 2500); return; }
+              timer.textContent = String(Math.floor(sisa / 60)).padStart(2, '0') + ':' + String(sisa % 60).padStart(2, '0');
+              sisa -= 1;
+              setTimeout(tick, 1000);
+            })();
+          }
+        })();
         (function () {
           var box = document.querySelector('[data-cancel-seconds]');
           if (!box) return;

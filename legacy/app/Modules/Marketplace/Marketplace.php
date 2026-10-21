@@ -1099,22 +1099,37 @@ function marketplace_release_stock(PDO $db, int $orderId, string $reason = 'Pesa
     }
 }
 
+/**
+ * V17.0.40 — batas waktu pembayaran QRIS/VA (menit). Default 30.
+ */
+function marketplace_payment_timeout_minutes(): int
+{
+    $m = (int) setting('marketplace_payment_timeout_minutes', '30');
+    return max(1, min(1440, $m));
+}
+
 function marketplace_expire_if_needed(PDO $db, array $order): array
 {
-    if (($order['payment_status'] ?? '') === 'pending' && !empty($order['payment_expired_at'])) {
-        $expiredAt = strtotime((string) $order['payment_expired_at']);
-        if ($expiredAt && $expiredAt < time()) {
-            $stmt = $db->prepare("UPDATE online_orders SET payment_status='expired',order_status='expired',cancelled_at=COALESCE(cancelled_at,NOW()),updated_at=NOW() WHERE id=? AND payment_status='pending'");
-            $stmt->execute([(int) $order['id']]);
-            if ($stmt->rowCount() > 0) {
-                marketplace_release_stock($db, (int) $order['id'], 'Pembayaran melewati batas waktu.');
-                marketplace_add_event($db, (int) $order['id'], 'expired', 'Pembayaran kedaluwarsa', 'Pesanan otomatis dibatalkan dan stok dikembalikan.');
-            }
-            $fresh = marketplace_get_order($db, (string) $order['order_number']);
-            if ($fresh) return $fresh;
-        }
+    if (!in_array((string) ($order['payment_status'] ?? ''), ['pending', 'error'], true)) return $order;
+
+    // V17.0.40 — dibandingkan di MySQL: bebas beda timezone PHP/DB, dan tetap jalan
+    // walau payment_expired_at kosong (pakai created_at + batas menit).
+    try {
+        $chk = $db->prepare("SELECT (COALESCE(payment_expired_at, created_at + INTERVAL ? MINUTE) <= NOW()) FROM online_orders WHERE id=? AND payment_status IN ('pending','error')");
+        $chk->execute([marketplace_payment_timeout_minutes(), (int) $order['id']]);
+        if ((int) $chk->fetchColumn() !== 1) return $order;
+    } catch (Throwable $e) {
+        return $order;
     }
-    return $order;
+
+    $stmt = $db->prepare("UPDATE online_orders SET payment_status='expired',order_status='expired',cancelled_at=COALESCE(cancelled_at,NOW()),updated_at=NOW() WHERE id=? AND payment_status IN ('pending','error')");
+    $stmt->execute([(int) $order['id']]);
+    if ($stmt->rowCount() > 0) {
+        marketplace_release_stock($db, (int) $order['id'], 'Pembayaran melewati batas waktu.');
+        marketplace_add_event($db, (int) $order['id'], 'expired', 'Pembayaran kedaluwarsa', 'Pesanan otomatis dibatalkan dan stok dikembalikan.');
+    }
+    $fresh = marketplace_get_order($db, (string) $order['order_number']);
+    return $fresh ?: $order;
 }
 
 /**
@@ -1727,11 +1742,13 @@ function marketplace_create_order(PDO $db, array $payload): array
         if ($isCod) { $payment = null; } else {
         $payment = marketplace_pakasir_create($db, $orderNumber, $grandAmount, $paymentMethod);
         $expired = marketplace_datetime_from_iso($payment['expired_at'] ?? null);
-        $stmt = $db->prepare("UPDATE online_orders SET payment_txn_id=?,payment_amount=?,payment_fee=?,payment_total=?,payment_qr_string=?,payment_va_number=?,payment_link=?,payment_status=?,payment_expired_at=?,updated_at=NOW() WHERE order_number=?");
+        // V17.0.40 — batas bayar QRIS/VA maksimal N menit sejak instruksi dibuat.
+        $timeoutMin = marketplace_payment_timeout_minutes();
+        $stmt = $db->prepare("UPDATE online_orders SET payment_txn_id=?,payment_amount=?,payment_fee=?,payment_total=?,payment_qr_string=?,payment_va_number=?,payment_link=?,payment_status=?,payment_expired_at=LEAST(COALESCE(?, NOW() + INTERVAL ? MINUTE), NOW() + INTERVAL ? MINUTE),updated_at=NOW() WHERE order_number=?");
         $stmt->execute([
             $payment['txn_id'],(float) $payment['amount'],(float) $payment['fee'],(float) $payment['total_payment'],
             $payment['qr_string'] ?: null,$payment['va_number'] ?: null,$payment['payment_link'] ?: null,
-            $payment['status'] === 'completed' ? 'paid' : 'pending',$expired,$orderNumber
+            $payment['status'] === 'completed' ? 'paid' : 'pending',$expired,$timeoutMin,$timeoutMin,$orderNumber
         ]);
         marketplace_add_event($db, $orderId, 'payment_created', 'Instruksi pembayaran dibuat', marketplace_pakasir_methods()[$paymentMethod]);
         if ($payment['status'] === 'completed') {
