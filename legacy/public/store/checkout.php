@@ -18,6 +18,9 @@ $savedAddresses = ($db && $customer) ? marketplace_customer_addresses($db, (int)
 $pointsAvailable = (int)($customer['points'] ?? 0);
 $pointValue = max(1,(float)setting('member_point_value','100'));
 $pointMinRedeem = max(1,(int)setting('member_point_min_redeem','1'));
+$pointMaxRedeem = max(1,(int)setting('member_point_max_redeem','100'));
+if ($pointMinRedeem > $pointMaxRedeem) $pointMinRedeem = 1;
+$pointsUsable = min($pointsAvailable, $pointMaxRedeem);
 $pointsEnabled = $customer && setting('marketplace_points_redeem_enabled','on')==='on';
 $bodyClass = 'checkout-page-body';
 require __DIR__ . '/_header.php';
@@ -47,7 +50,7 @@ require __DIR__ . '/_header.php';
           data-delivery-ready="<?= $deliveryReady ? '1' : '0'; ?>" data-pickup-ready="<?= $pickupReady ? '1' : '0'; ?>"
           data-order-url="<?= e(legacy_base_url('store/api/create-order.php')); ?>"
           data-voucher-url="<?= e(legacy_base_url('store/api/voucher-check.php')); ?>"
-          data-point-value="<?= e((string)$pointValue); ?>" data-point-min="<?= (int)$pointMinRedeem; ?>" data-point-available="<?= (int)$pointsAvailable; ?>"
+          data-point-value="<?= e((string)$pointValue); ?>" data-point-min="<?= (int)$pointMinRedeem; ?>" data-point-max="<?= (int)$pointMaxRedeem; ?>" data-point-available="<?= (int)$pointsAvailable; ?>"
           data-cod-enabled="<?= $codEnabled ? '1' : '0'; ?>"
           data-ready="<?= $checkoutReady ? '1' : '0'; ?>">
         <?= CSRF::input(); ?>
@@ -171,7 +174,7 @@ require __DIR__ . '/_header.php';
             <div id="checkoutItems" class="checkout-items"></div>
             <div class="checkout-weight-row"><span><i class="bi bi-box-seam"></i> Berat Kiriman</span><b id="checkoutWeight">-</b></div>
             <div class="checkout-voucher-box"><label for="voucherCode">Voucher Marketplace</label><div><input id="voucherCode" name="voucher_code" maxlength="80" placeholder="Masukkan kode voucher"><button type="button" id="applyVoucherBtn">Pakai</button></div><small id="voucherMessage">Voucher akan divalidasi dari server.</small></div>
-            <?php if($pointsEnabled): ?><div class="checkout-voucher-box checkout-points-box"><label for="pointsToUse">Tukar Poin Member</label><div><input id="pointsToUse" name="points_to_use" type="number" min="0" max="<?= (int)$pointsAvailable; ?>" step="1" value="0" placeholder="0"><button type="button" id="useMaxPointsBtn">Maks</button></div><small>Tersedia <b><?= number_format($pointsAvailable,0,',','.'); ?> poin</b> • 1 poin = <?= rupiah($pointValue); ?> • minimal <?= (int)$pointMinRedeem; ?> poin.</small></div><?php else: ?><input type="hidden" name="points_to_use" value="0"><?php endif; ?>
+            <?php if($pointsEnabled): ?><div class="checkout-voucher-box checkout-points-box"><label for="pointsToUse">Tukar Poin Member</label><div><input id="pointsToUse" name="points_to_use" type="number" min="0" max="<?= (int)$pointsUsable; ?>" step="1" value="0" placeholder="0"><button type="button" id="useMaxPointsBtn">Maks</button></div><small>Tersedia <b><?= number_format($pointsAvailable,0,',','.'); ?> poin</b> • 1 poin = <?= rupiah($pointValue); ?> • minimal <?= (int)$pointMinRedeem; ?> poin • maksimal <b><?= (int)$pointMaxRedeem; ?> poin (<?= rupiah($pointMaxRedeem * $pointValue); ?>)</b> per transaksi.</small></div><?php else: ?><input type="hidden" name="points_to_use" value="0"><?php endif; ?>
             <div class="summary-lines">
                 <div><span>Subtotal</span><b data-cart-subtotal>Rp 0</b></div>
                 <div><span>Ongkir</span><b id="checkoutShippingText">Rp 0</b></div>

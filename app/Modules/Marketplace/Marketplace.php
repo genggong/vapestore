@@ -1609,6 +1609,9 @@ function marketplace_create_order(PDO $db, array $payload): array
     $grandAmount = (int) round($grandTotal);
     if ($grandAmount <= 0) throw new InvalidArgumentException('Total pembayaran setelah poin/voucher harus lebih dari Rp0. Kurangi poin yang digunakan.');
 
+    // V17.0.39 — siapkan tabel poin sebelum transaksi (DDL memicu implicit commit).
+    if ($customerId > 0 && function_exists('marketplace_v15_points_ensure')) marketplace_v15_points_ensure($db);
+
     $db->beginTransaction();
     try {
         // Lock and deduct stock so POS + marketplace cannot sell the same unit while payment is pending.

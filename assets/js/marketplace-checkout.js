@@ -56,6 +56,7 @@
     const useMaxPointsBtn = $('#useMaxPointsBtn');
     const pointValue = Math.max(1, Number(form.dataset.pointValue || 100));
     const pointMin = Math.max(1, Number(form.dataset.pointMin || 1));
+    const pointMax = Math.max(1, Number(form.dataset.pointMax || 100));
     const pointAvailable = Math.max(0, Number(form.dataset.pointAvailable || 0));
     const voucherCode = $('#voucherCode');
     const voucherMessage = $('#voucherMessage');
@@ -98,7 +99,7 @@
       if (shippingText) shippingText.textContent = money(state.shipping);
       const baseAfterVoucher = Math.max(0, Number(state.subtotal || localSubtotal) - Number(state.discount || 0));
       let requestedPoints = Math.max(0, Math.floor(Number(pointsInput?.value || 0)));
-      requestedPoints = Math.min(requestedPoints, pointAvailable, Math.floor(baseAfterVoucher / pointValue));
+      requestedPoints = Math.min(requestedPoints, pointAvailable, pointMax, Math.floor(baseAfterVoucher / pointValue));
       if (requestedPoints > 0 && requestedPoints < pointMin) requestedPoints = 0;
       state.pointsDiscount = requestedPoints * pointValue;
       if (discountText) discountText.textContent = '- ' + money(state.discount || 0);
@@ -373,7 +374,7 @@
       });
     });
 
-    pointsInput?.addEventListener('input', () => { if(Number(pointsInput.value||0)>pointAvailable) pointsInput.value=String(pointAvailable); updateTotals(); });
+    pointsInput?.addEventListener('input', () => { const cap = Math.min(pointAvailable, pointMax); if(Number(pointsInput.value||0)>cap) pointsInput.value=String(cap); updateTotals(); });
     useMaxPointsBtn?.addEventListener('click', () => { const base=Math.max(0,Number(state.subtotal||cartApi?.subtotal?.()||0)-Number(state.discount||0)); const max=Math.min(pointAvailable,Math.floor(base/pointValue)); pointsInput.value=String(max>=pointMin?max:0); updateTotals(); });
 
     async function applyVoucher() {
