@@ -43,8 +43,16 @@ if (is_post()) {
     $creditLimit = (float)($_POST['credit_limit'] ?? 0);
     $note = trim($_POST['note'] ?? '');
     $status = $_POST['status'] ?? 'active';
-    // V17.0.17: password marketplace (opsional) — member baru dari POS langsung bisa login marketplace
-    $newPassword = (string)($_POST['marketplace_password'] ?? '');
+    // V17.0.32: password marketplace otomatis untuk member baru.
+    // Kalau admin mengosongkan kolom, pakai password default (setting member_default_password).
+    $defaultPassword = trim((string) setting('member_default_password', 'vapekong123'));
+    if ($defaultPassword === '') $defaultPassword = 'vapekong123';
+    $newPassword = trim((string) ($_POST['marketplace_password'] ?? ''));
+    $usedDefaultPassword = false;
+    if ($newPassword === '') {
+        $newPassword = $defaultPassword;
+        $usedDefaultPassword = true;
+    }
 
     if ($name === '') {
         flash('error', 'Nama pelanggan wajib diisi.');
@@ -66,13 +74,13 @@ if (is_post()) {
             }
             $stmt = $db->prepare("INSERT INTO customers (name, phone, email, address, member_code, member_level, price_level, points, credit_limit, note, status, marketplace_password_hash, marketplace_registered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
             $stmt->execute([$name, $phone ?: null, $email ?: null, $address ?: null, $memberCode ?: null, $memberLevel, $priceLevel, $points, $creditLimit, $note ?: null, $status, password_hash($newPassword, PASSWORD_DEFAULT)]);
-            Auth::log('create_customer', 'Tambah pelanggan ' . $name . ' (password marketplace di-set)');
+            Auth::log('create_customer', 'Tambah pelanggan ' . $name . ($usedDefaultPassword ? ' (password marketplace default ' . $defaultPassword . ')' : ' (password marketplace di-set)'));
         } else {
             $stmt = $db->prepare("INSERT INTO customers (name, phone, email, address, member_code, member_level, price_level, points, credit_limit, note, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$name, $phone ?: null, $email ?: null, $address ?: null, $memberCode ?: null, $memberLevel, $priceLevel, $points, $creditLimit, $note ?: null, $status]);
             Auth::log('create_customer', 'Tambah pelanggan ' . $name);
         }
-        flash('success', 'Pelanggan berhasil ditambahkan.');
+        flash('success', 'Pelanggan berhasil ditambahkan.' . ($usedDefaultPassword ? ' Password login marketplace: ' . $newPassword . ' (No HP + password ini).' : ''));
 
         legacy_redirect('admin/customers/index.php');
     } catch (Throwable $e) {
@@ -130,7 +138,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
             </div>
             <div class="customer-field full"><label>Alamat</label><textarea name="address"><?= e($customer['address']); ?></textarea></div>
             <div class="customer-field full"><label>Catatan</label><textarea name="note"><?= e($customer['note']); ?></textarea></div>
-            <div class="customer-field full"><label>Password Marketplace (opsional)</label><input type="password" name="marketplace_password" placeholder="Kosongkan jika belum ingin dibuatkan login" autocomplete="new-password"><small style="color:#8b93a1">Untuk login pelanggan di marketplace pakai No HP + password ini. Minimal 6 karakter. Kalau dikosongkan, bisa diisi nanti dari halaman Edit Pelanggan.</small></div>
+            <div class="customer-field full"><label>Password Marketplace</label><input type="text" name="marketplace_password" placeholder="Kosongkan = otomatis <?= e($defaultPassword) ?>" autocomplete="off"><small style="color:#8b93a1">Login marketplace pakai <b>No HP + password</b>. Kalau dikosongkan, sistem otomatis memakai <b><?= e($defaultPassword) ?></b> supaya member langsung bisa login. Minimal 6 karakter.</small></div>
         </div>
 
         <div class="customer-form-actions">

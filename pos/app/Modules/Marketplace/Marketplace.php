@@ -1052,6 +1052,14 @@ function marketplace_customer(PDO $db = null): ?array
     } catch (Throwable $e) { return null; }
 }
 
+function marketplace_default_member_password(): string
+{
+    // V17.0.32 — password default member baru (bisa diubah lewat setting member_default_password).
+    $def = '';
+    if (function_exists('setting')) { try { $def = trim((string) setting('member_default_password', 'vapekong123')); } catch (Throwable $e) { $def = ''; } }
+    return $def !== '' ? $def : 'vapekong123';
+}
+
 function marketplace_customer_login(PDO $db, string $identity, string $password): bool
 {
     marketplace_install($db);
@@ -1059,8 +1067,34 @@ function marketplace_customer_login(PDO $db, string $identity, string $password)
     if ($identity === '' || $password === '') return false;
     $stmt = $db->prepare("SELECT * FROM customers WHERE status='active' AND (LOWER(email)=LOWER(?) OR phone=?) LIMIT 1");
     $stmt->execute([$identity,$identity]);
-    $row = $stmt->fetch();
-    if (!$row || empty($row['marketplace_password_hash']) || !password_verify($password, (string) $row['marketplace_password_hash'])) return false;
+    $row = $stmt->fetch() ?: null;
+
+    // V17.0.32 — nomor HP boleh ditulis 08…, +62…, 62…, atau pakai spasi/tanda hubung.
+    if (!$row) {
+        $digits = preg_replace('/\D+/', '', $identity);
+        if (is_string($digits) && strlen($digits) >= 8) {
+            $tail = substr($digits, -8);
+            $c = $db->prepare("SELECT * FROM customers WHERE status='active' AND phone LIKE ? LIMIT 25");
+            $c->execute(['%' . $tail]);
+            foreach (($c->fetchAll() ?: []) as $cand) {
+                $cd = preg_replace('/\D+/', '', (string) ($cand['phone'] ?? ''));
+                if (is_string($cd) && $cd !== '' && substr($cd, -8) === $tail) { $row = $cand; break; }
+            }
+        }
+    }
+    if (!$row) return false;
+
+    // V17.0.32 — member yang didaftarkan tanpa password boleh masuk dengan password default
+    // (sekali masuk, hash-nya langsung disimpan supaya aman & tidak dihitung ulang).
+    if (empty($row['marketplace_password_hash'])) {
+        if (!hash_equals(marketplace_default_member_password(), $password)) return false;
+        if (marketplace_column_exists($db, 'customers', 'marketplace_password_hash')) {
+            $db->prepare("UPDATE customers SET marketplace_password_hash=? WHERE id=?")
+               ->execute([password_hash($password, PASSWORD_DEFAULT), (int) $row['id']]);
+        }
+    } elseif (!password_verify($password, (string) $row['marketplace_password_hash'])) {
+        return false;
+    }
     session_regenerate_id(true);
     $_SESSION['marketplace_customer_id'] = (int) $row['id'];
     $db->prepare("UPDATE customers SET marketplace_last_login_at=NOW() WHERE id=?")->execute([(int)$row['id']]);
