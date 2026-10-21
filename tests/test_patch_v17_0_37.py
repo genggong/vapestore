@@ -91,6 +91,7 @@ $mk = function ($pm) use ($db, $b) {
     ]);
 };
 $cleanup = function ($id) use ($db) {
+    try { marketplace_release_stock($db, (int) $id, 'cleanup test'); } catch (Throwable $e) {}
     foreach (['marketplace_courier_events','marketplace_courier_assignments','marketplace_order_notifications','online_order_events','online_order_items'] as $t) {
         $db->prepare("DELETE FROM {$t} WHERE order_id=?")->execute([(int) $id]);
     }
@@ -154,6 +155,7 @@ unset($_SESSION['marketplace_customer_id']);
 $res = marketplace_customer_cancel_order($db, $o['order_number'], $o['public_token']);
 $after = marketplace_get_order($db, $o['order_number']);
 echo ($res['ok'] && $after['order_status'] === 'cancelled') ? 'guest_bisa' : 'guest_gagal';
+try { marketplace_release_stock($db, (int) $o['id'], 'cleanup test'); } catch (Throwable $e) {}
 foreach (['marketplace_courier_events','marketplace_courier_assignments','marketplace_order_notifications','online_order_events','online_order_items'] as $t) {
     $db->prepare("DELETE FROM {$t} WHERE order_id=?")->execute([(int) $o['id']]);
 }

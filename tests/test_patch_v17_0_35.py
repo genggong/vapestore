@@ -86,6 +86,7 @@ $row = $o->fetch(PDO::FETCH_ASSOC);
 $out[] = 'order_deadline:' . ($row['pickup_deadline_at'] ?: 'kosong');
 $out[] = 'order_bedahari:' . (date('Y-m-d', strtotime((string) $row['pickup_deadline_at'])) === date('Y-m-d') ? 'ya' : 'tidak');
 
+try { marketplace_release_stock($db, (int) $row['id'], 'cleanup test'); } catch (Throwable $e) {}
 foreach (['marketplace_courier_events','marketplace_courier_assignments','marketplace_order_notifications','online_order_events'] as $t) {
     $db->prepare("DELETE FROM {$t} WHERE order_id=?")->execute([(int) $row['id']]);
 }
