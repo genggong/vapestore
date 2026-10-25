@@ -1575,7 +1575,7 @@ function marketplace_create_order(PDO $db, array $payload): array
         if ($destinationId <= 0 || $destinationLabel === '') throw new InvalidArgumentException('Pilih tujuan pengiriman dari RajaOngkir.');
 
         if ($requestedCourier === 'store') {
-            if (!marketplace_store_courier_validate_destination($payload, $destinationId)) {
+            if (!marketplace_store_courier_validate_destination($payload, $destinationId, $branchId)) {
                 throw new RuntimeException('Alamat tidak termasuk area layanan Kurir Toko atau data wilayah berubah. Silakan pilih wilayah kembali.');
             }
             $selected = marketplace_store_courier_option($province,$city,$district,$subdistrict,$destinationId,$branchId);

@@ -164,7 +164,7 @@ function marketplace_store_courier_option(string $province, string $city, string
     } catch(Throwable $e) { return null; }
 }
 
-function marketplace_store_courier_validate_destination(array $payload, int $destinationId): bool
+function marketplace_store_courier_validate_destination(array $payload, int $destinationId, int $branchId = 0): bool
 {
     $province = trim((string)($payload['province'] ?? ''));
     $city = trim((string)($payload['city'] ?? ''));
