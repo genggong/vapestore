@@ -198,7 +198,18 @@ class Auth
     public static function refreshPermissions(): void
     {
         unset($_SESSION['auth_permissions']);
-        self::permissions();
+        $_SESSION['auth_permissions'] = self::permissions();
+    }
+
+    // V17.0.48: kasir boleh input operasional tanpa akses menu Keuangan (finance.view).
+    public static function guard_finance_operational(): void
+    {
+        self::requireLogin();
+        $allowed = self::can('finance.operational') || self::can('finance.manage') || self::can('finance.view');
+        if (!$allowed) {
+            flash('error', 'Kamu tidak punya hak akses ke halaman tersebut.');
+            legacy_redirect('admin/dashboard.php');
+        }
     }
 
     private static function ensurePermissionTable(PDO $db): void

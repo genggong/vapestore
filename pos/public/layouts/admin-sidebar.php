@@ -71,6 +71,7 @@ try {
             menu_link('dashboard.view', 'admin/dashboard.php', 'bi-house-door-fill', 'Dashboard', $currentPath);
             menu_link('pos.access', 'admin/pos/index.php', 'bi-cart-check-fill', 'POS Kasir', $currentPath);
             menu_link('pos.access', 'admin/stock-requests/index.php', 'bi-arrow-down-up', 'Request Stock', $currentPath);
+            menu_link('finance.operational', 'admin/operasional/index.php', 'bi-tools', 'Input Operasional', $currentPath);
             if (menu_can('dashboard.view')) {
                 echo '<a href="' . e(base_url()) . '" target="_blank" rel="noopener" class=""><i class="bi bi-globe2"></i><span>Website E-Commerce</span><i class="bi bi-box-arrow-up-right" style="margin-left:auto;font-size:.78rem"></i></a>';
             }

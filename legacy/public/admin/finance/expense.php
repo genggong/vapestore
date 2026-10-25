@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../../../app/bootstrap.php';
-Auth::requireLogin();
+Auth::requirePermission('finance.view'); // V17.0.48 kasir tanpa akses keuangan
 $pageTitle = 'Tambah Pengeluaran';
 $db = Database::connect();
 

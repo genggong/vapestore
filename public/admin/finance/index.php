@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../../app/bootstrap.php';
 require_once __DIR__ . '/../../../app/Modules/Accounting/Accounting.php';
 
-Auth::requireLogin();
+Auth::requirePermission('finance.view');
 $pageTitle = 'Keuangan';
 $db = Database::connect();
 

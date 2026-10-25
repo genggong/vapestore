@@ -42,6 +42,7 @@ function permission_groups(): array
             'items' => [
                 'finance.view' => ['Keuangan', 'Melihat modul keuangan'],
                 'finance.manage' => ['Kelola Keuangan', 'Tambah pemasukan/pengeluaran'],
+                'finance.operational' => ['Input Operasional', 'Kasir mencatat beban operasional tanpa buka menu Keuangan'],
                 'reports.view' => ['Laporan', 'Melihat semua laporan'],
                 'backup.view' => ['Backup & Export', 'Melihat halaman backup'],
                 'backup.manage' => ['Kelola Backup', 'Buat, download, hapus backup'],
@@ -139,6 +140,7 @@ function seed_default_role_permissions(PDO $db): void
         'shifts.view',
         'shifts.manage',
         'returns.view',
+        'finance.operational',
     ];
 
     $insert = $db->prepare("INSERT INTO role_permissions (role_id, permission_key, is_allowed) VALUES (?, ?, 1)");
@@ -183,6 +185,13 @@ function owner_permission_topup(PDO $db): void
                 $ins->execute([(int)$role['id'], $key]);
             }
         }
+        // V17.0.48: kasir mendapat 'finance.operational' (input beban) tanpa hak buka menu Keuangan.
+        try {
+            $cas = $db->query("SELECT id, slug FROM roles WHERE slug='cashier'")->fetchAll() ?: [];
+            foreach ($cas as $role) {
+                $ins->execute([(int)$role['id'], 'finance.operational']);
+            }
+        } catch (Throwable $e) {}
         if (class_exists('Auth') && in_array(Auth::role(), ['super_admin', 'owner'], true)) {
             Auth::refreshPermissions();
         }
