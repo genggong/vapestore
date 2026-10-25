@@ -23,7 +23,7 @@ echo "    ${COUNT} berkas diperiksa"
 unzip -o -q "${ZIP}"; rm -f "${ZIP}"
 
 FAIL=0
-check() { if [ -f "$1" ] && grep -q -- "$2" "$1"; then echo "  [OK] $3"; else echo "  [!!] $3"; FAIL=1; fi; }
+check() { if [ -f "$1" ] && grep -Fq -- "$2" "$1"; then echo "  [OK] $3"; else echo "  [!!] $3"; FAIL=1; fi; }
 check "legacy/public/admin/marketplace-courier-rates/index.php" 'window.fillEdit=fillEdit' "tombol Edit berfungsi"
 check "legacy/public/admin/marketplace-courier-rates/index.php" 'const p2=document.getElementById' "proxy elemen select"
 check "legacy/app/Modules/Accounting/Accounting.php" "['operating_expense'] - \$branch['shipping_income']" "laba minus ongkir"
