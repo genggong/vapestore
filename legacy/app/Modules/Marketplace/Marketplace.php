@@ -1422,7 +1422,14 @@ function marketplace_order_notify_message(PDO $db, array $order): string
     } else {
         $lines[] = 'Pembayaran: ' . strtoupper($pay) . ' (' . $methodLabel . ')';
     }
-    $lines[] = 'Waktu: ' . date('d/m/Y H:i');
+    $lines[] = 'Waktu: ';
+    try {
+        // V17.0.45 — PHP date() = UTC, DB = +08; pakai jam MySQL biar notif WA tidak telat 8 jam.
+        $w = $db->query('SELECT NOW()')->fetchColumn();
+        $lines[count($lines) - 1] = 'Waktu: ' . date('d/m/Y H:i', strtotime((string) $w));
+    } catch (Throwable $e) {
+        $lines[count($lines) - 1] = 'Waktu: ' . date('d/m/Y H:i');
+    }
     if (strtolower((string) ($order['courier_code'] ?? '')) === 'pickup' && !empty($order['pickup_deadline_at'])) {
         $dl = strtotime((string) $order['pickup_deadline_at']);
         if ($dl) $lines[] = 'Batas ambil: ' . date('d/m/Y H:i', $dl);
