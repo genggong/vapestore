@@ -170,17 +170,19 @@ function marketplace_store_courier_validate_destination(array $payload, int $des
     $city = trim((string)($payload['city'] ?? ''));
     $district = trim((string)($payload['district'] ?? ''));
     $subdistrict = trim((string)($payload['subdistrict'] ?? ''));
-    $postal = trim((string)($payload['postal_code'] ?? ''));
-    if (!marketplace_store_courier_eligible_region($province,$city,$district)) return false;
+    $cfg = marketplace_store_courier_config();
+    if (!$cfg['enabled']) return false;
     try {
-        $resolved = marketplace_rajaongkir_resolve_direct_destination($subdistrict,$district,$city,$postal);
-        if((int)($resolved['id'] ?? 0) !== $destinationId) return false;
-        $cfg=marketplace_store_courier_config();
-        if(($cfg['rate_mode']??'flat')==='subdistrict'){
-            $db=Database::connect();
-            return marketplace_v16_store_courier_rate($db,$destinationId,$province,$city,$district,$subdistrict,$branchId)!==null;
+        // V17.0.46 — mode subdistrict: validasi langsung cek tarif di DB (branch-aware),
+        // TIDAK resolve ulang via live API RajaOngkir (yang flaky & bisa beda destination_id,
+        // sehingga checkout Kurir Toko ditolak padahal kelurahan sudah punya tarif).
+        if (($cfg['rate_mode'] ?? 'flat') === 'subdistrict') {
+            $db = Database::connect();
+            $rate = marketplace_v16_store_courier_rate($db, $destinationId, $province, $city, $district, $subdistrict, $branchId);
+            return $rate !== null;
         }
-        return true;
+        // mode flat: hanya butuh region dalam cakupan (same_district/city/province).
+        return marketplace_store_courier_eligible_region($province, $city, $district);
     } catch (Throwable $e) {
         return false;
     }
