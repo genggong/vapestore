@@ -147,7 +147,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
             <div class="icon"><i class="bi bi-truck"></i></div>
             <span>Pendapatan Ongkir</span>
             <h3><?= rupiah($summary['shipping_income']); ?></h3>
-            <small>Ongkir penjualan online (dikurangi dari laba bersih)</small>
+            <small>Ongkir sudah masuk penjualan bersih (bukan laba)</small>
         </article>
         <article class="accounting-kpi">
             <div class="icon"><i class="bi bi-tools"></i></div>
