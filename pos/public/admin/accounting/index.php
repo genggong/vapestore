@@ -147,7 +147,13 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
             <div class="icon"><i class="bi bi-truck"></i></div>
             <span>Pendapatan Ongkir</span>
             <h3><?= rupiah($summary['shipping_income']); ?></h3>
-            <small>Ongkir penjualan online (dipisah dari laba barang)</small>
+            <small>Ongkir penjualan online (dikurangi dari laba bersih)</small>
+        </article>
+        <article class="accounting-kpi">
+            <div class="icon"><i class="bi bi-tools"></i></div>
+            <span>Biaya Operasional</span>
+            <h3><?= rupiah($summary['operating_expense']); ?></h3>
+            <small>Beban dari menu Keuangan</small>
         </article>
         <article class="accounting-kpi featured">
             <div class="icon"><i class="bi bi-piggy-bank"></i></div>

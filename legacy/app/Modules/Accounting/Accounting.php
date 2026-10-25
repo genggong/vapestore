@@ -492,7 +492,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
         $branch['net_sales'] = $branch['gross_sales'] - $branch['shipping_income'] - $branch['refunds'];
         $branch['cogs'] = $branch['cogs_sold'] - $branch['cogs_returned'];
         $branch['gross_profit'] = $branch['net_sales'] - $branch['cogs'];
-        $branch['net_profit'] = $branch['gross_profit'] + $branch['shipping_income'] + $branch['other_income'] - $branch['operating_expense'];
+        $branch['net_profit'] = $branch['gross_profit'] + $branch['other_income'] - $branch['operating_expense'] - $branch['shipping_income']; // V17.0.47 ongkir = biaya, dikurangi
         $branch['cash_in'] = $branch['sales_collected'] + $branch['debt_collections'] + $branch['other_income'];
         $branch['cash_out'] = $branch['purchase_paid'] + $branch['refunds'] + $branch['operating_expense'];
         $branch['net_cashflow'] = $branch['cash_in'] - $branch['cash_out'];
@@ -503,7 +503,7 @@ function accounting_build_report(PDO $db, string $from, string $to, int $selecte
             $day['net_sales'] = $day['gross_sales'] - $day['shipping_income'] - $day['refunds'];
             $day['cogs'] = $day['cogs_sold'] - $day['cogs_returned'];
             $day['gross_profit'] = $day['net_sales'] - $day['cogs'];
-            $day['net_profit'] = $day['gross_profit'] + $day['shipping_income'] + $day['other_income'] - $day['operating_expense'];
+            $day['net_profit'] = $day['gross_profit'] + $day['other_income'] - $day['operating_expense'] - $day['shipping_income'];
             $day['cash_in'] = $day['sales_collected'] + $day['debt_collections'] + $day['other_income'];
             $day['cash_out'] = $day['purchase_paid'] + $day['refunds'] + $day['operating_expense'];
             $day['net_cashflow'] = $day['cash_in'] - $day['cash_out'];
