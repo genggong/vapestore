@@ -4,6 +4,7 @@ require_once __DIR__ . '/MarketplaceV16.php';
 require_once __DIR__ . '/SchemaDoctor.php';
 require_once __DIR__ . '/StoreCourier.php';
 require_once __DIR__ . '/StorePickup.php';
+require_once __DIR__ . '/CasaKuPayment.php';
 
 /**
  * Marketplace core bridge for the legacy POS.
@@ -1747,7 +1748,7 @@ function marketplace_create_order(PDO $db, array $payload): array
     // V17.0.34 — COD tidak membuat instruksi pembayaran online.
     try {
         if ($isCod) { $payment = null; } else {
-        $payment = marketplace_pakasir_create($db, $orderNumber, $grandAmount, $paymentMethod);
+        $payment = marketplace_payment_create($db, $orderNumber, $grandAmount, $paymentMethod);
         $expired = marketplace_datetime_from_iso($payment['expired_at'] ?? null);
         // V17.0.40 — batas bayar QRIS/VA maksimal N menit sejak instruksi dibuat.
         $timeoutMin = marketplace_payment_timeout_minutes();
@@ -1793,7 +1794,7 @@ function marketplace_retry_payment(PDO $db, array $order): array
     if (in_array((string) $order['payment_status'], ['paid', 'expired', 'cancelled'], true)) {
         throw new RuntimeException('Pembayaran pesanan ini tidak dapat dibuat ulang.');
     }
-    $payment = marketplace_pakasir_create($db, (string) $order['order_number'], (int) round((float) $order['grand_total']), (string) $order['payment_method']);
+    $payment = marketplace_payment_create($db, (string) $order['order_number'], (int) round((float) $order['grand_total']), (string) $order['payment_method']);
     $expired = marketplace_datetime_from_iso($payment['expired_at'] ?? null);
     $stmt = $db->prepare("UPDATE online_orders SET payment_txn_id=?,payment_amount=?,payment_fee=?,payment_total=?,payment_qr_string=?,payment_va_number=?,payment_link=?,payment_status=?,payment_expired_at=?,updated_at=NOW() WHERE id=?");
     $stmt->execute([

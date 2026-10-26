@@ -10,8 +10,7 @@ $footerFacebook = storefront_external_url($footerStore['marketplace_facebook'] ?
     <div class="store-container footer-grid">
         <div class="footer-brand-col">
             <a class="store-brand footer-logo" href="<?= legacy_base_url(); ?>">
-                <img class="store-logo-image footer-logo-image" src="<?= e($footerLogo); ?>" alt="<?= e($footerStore['store_name']); ?>" onerror="var a=this.closest('.store-brand');if(!this.dataset.fallbackTried){this.dataset.fallbackTried='1';this.src='<?= e(storefront_asset_url('logo-vapekong.svg')); ?>';}else{if(a)a.classList.add('logo-broken');this.style.display='none';}">
-                <span class="store-brand-text-fallback"><?= e($footerStore['store_name']); ?></span>
+                <img class="store-logo-image footer-logo-image" src="<?= e($footerLogo); ?>" alt="<?= e($footerStore['store_name']); ?>" onerror="this.onerror=null;this.src='<?= e(storefront_asset_url('logo-vapekong.svg')); ?>';">
             </a>
             <p><?= e($footerStore['marketplace_footer_description']); ?></p>
             <?php if ($footerInstagram || $footerTiktok || $footerFacebook || $footerWhatsapp): ?>
@@ -33,8 +32,31 @@ $footerFacebook = storefront_external_url($footerStore['marketplace_facebook'] ?
     </div>
 </footer>
 
-<?php if ($footerWhatsapp): ?>
-<a class="floating-whatsapp" href="<?= e($footerWhatsapp); ?>" target="_blank" rel="noopener noreferrer" aria-label="Chat WhatsApp <?= e($footerStore['store_name']); ?>"><i class="bi bi-whatsapp"></i><span>Chat</span></a>
+<?php
+// 1 ikon WhatsApp -> menu: LiveChat (admin) + 3 CS admin
+$fabOptions = [
+    ['label' => 'LiveChat', 'sub' => 'Bantuan langsung admin', 'icon' => 'bi-headset',
+     'url' => !empty($footerStore['marketplace_wa_admin_phone']) ? storefront_whatsapp_url(['marketplace_whatsapp' => $footerStore['marketplace_wa_admin_phone']]) : ''],
+];
+foreach (['1', '2', '3'] as $i) {
+    $csNum = trim((string) ($footerStore['marketplace_cs_' . $i] ?? ''));
+    if ($csNum !== '') {
+        $fabOptions[] = ['label' => 'CS ' . $i, 'sub' => 'Customer service', 'icon' => 'bi-whatsapp',
+            'url' => storefront_whatsapp_url(['marketplace_whatsapp' => $csNum])];
+    }
+}
+$fabOptions = array_values(array_filter($fabOptions, fn($o) => $o['url'] !== ''));
+?>
+<?php if ($fabOptions): ?>
+<div class="floating-fab" id="floatingFab" data-open="0">
+    <div class="floating-fab-menu" id="floatingFabMenu">
+        <?php foreach ($fabOptions as $fabOpt): ?>
+        <a class="floating-fab-option" href="<?= e($fabOpt['url']); ?>" target="_blank" rel="noopener noreferrer"><i class="bi <?= e($fabOpt['icon']); ?>"></i><span><b><?= e($fabOpt['label']); ?></b><i><?= e($fabOpt['sub']); ?></i></span></a>
+        <?php endforeach; ?>
+    </div>
+    <button type="button" class="floating-whatsapp" id="floatingFabBtn" aria-label="Buka kontak <?= e($footerStore['store_name']); ?>"><i class="bi bi-whatsapp"></i><span>Chat</span></button>
+</div>
+<script>(function(){var b=document.getElementById('floatingFabBtn');if(!b)return;var f=document.getElementById('floatingFab'),m=document.getElementById('floatingFabMenu');b.addEventListener('click',function(e){e.stopPropagation();var o=f.getAttribute('data-open')==='1';if(m)m.classList.toggle('show',!o);f.setAttribute('data-open',o?'0':'1');});document.addEventListener('click',function(e){if(f.getAttribute('data-open')==='1'&&!f.contains(e.target)){if(m)m.classList.remove('show');f.setAttribute('data-open','0');}});})();</script>
 <?php endif; ?>
 
 <div class="cart-drawer-backdrop" id="cartBackdrop"></div>
@@ -56,18 +78,6 @@ $footerFacebook = storefront_external_url($footerStore['marketplace_facebook'] ?
     <a class="<?= $activePage === 'tracking' ? 'active' : ''; ?>" href="<?= legacy_base_url('tracking'); ?>"><i class="bi bi-truck"></i><span>Tracking</span></a>
     <a class="<?= $activePage === 'account' ? 'active' : ''; ?>" href="<?= legacy_base_url(storefront_customer() ? 'akun' : 'masuk'); ?>"><i class="bi bi-person-fill"></i><span>Akun</span></a>
 </nav>
-<script>
-(function(){
-  function forceVisible(){
-    document.querySelectorAll('.reveal').forEach(function(el){el.classList.add('in-view');});
-    if(window.VapekongHideStoreLoader) window.VapekongHideStoreLoader();
-  }
-  // External storefront.js handles animation normally. If it is blocked/missing,
-  // never leave the actual page content invisible.
-  window.setTimeout(forceVisible, 900);
-  document.addEventListener('DOMContentLoaded', function(){ window.setTimeout(forceVisible, 1400); }, {once:true});
-})();
-</script>
-<script src="<?= legacy_base_url('assets/js/storefront.js?v=17.0.2'); ?>" onload="window.VapekongHideStoreLoader&&window.VapekongHideStoreLoader()" onerror="document.querySelectorAll('.reveal').forEach(function(el){el.classList.add('in-view')});window.VapekongHideStoreLoader&&window.VapekongHideStoreLoader()"></script>
+<script src="<?= legacy_base_url('assets/js/storefront.js?v=17.0.1'); ?>" onload="window.VapekongHideStoreLoader&&window.VapekongHideStoreLoader()" onerror="window.VapekongHideStoreLoader&&window.VapekongHideStoreLoader()"></script>
 </body>
 </html>

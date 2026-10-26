@@ -12,7 +12,7 @@ try {
     // V2 fallback: sinkronkan status langsung dari Pakasir setiap polling customer (JS 9 detik),
     // sehingga checkout tetap update walau webhook terlambat/gagal.
     if (($order['payment_status'] ?? '') === 'pending' && !empty($order['payment_txn_id'])) {
-        try { $order = marketplace_pakasir_sync_status($db, $order); } catch (Throwable $ignore) {}
+        try { $order = marketplace_payment_sync_status($db, $order); } catch (Throwable $ignore) {}
     }
     marketplace_api_json([
         'success' => true,

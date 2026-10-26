@@ -5,7 +5,7 @@ Auth::requireRole(['super_admin','owner']);
 $pageTitle='Pengaturan Marketplace';
 $db=Database::connect();
 marketplace_install($db);
-$pakasirToken=marketplace_ensure_secret($db,'pakasir_webhook_token'); // fallback webhook lama
+$pakasirToken=marketplace_ensure_secret($db,'pakasir_webhook_token');
 $cronToken=marketplace_ensure_secret($db,'marketplace_cron_token');
 $deliveryToken=marketplace_ensure_secret($db,'marketplace_delivery_webhook_token');
 $waWebhookSecret=marketplace_ensure_secret($db,'marketplace_wa_webhook_secret');
@@ -13,20 +13,32 @@ $waWebhookSecret=marketplace_ensure_secret($db,'marketplace_wa_webhook_secret');
 function mp_setting_save(PDO $db,string $key,string $value):void{
     marketplace_setting_set($db,$key,$value);
 }
-function mp_asset_upload(array $file,string $prefix):?string{ return legacy_store_optimized_image($file,'uploads/storefront',$prefix,8*1024*1024,1800,1800,80); }
+function mp_asset_upload(array $file,string $prefix):?string{
+    if(empty($file['name'])||empty($file['tmp_name'])) return null;
+    if(($file['error']??UPLOAD_ERR_OK)!==UPLOAD_ERR_OK) throw new RuntimeException('Upload aset marketplace gagal.');
+    if(($file['size']??0)>5*1024*1024) throw new RuntimeException('Ukuran aset marketplace maksimal 5MB.');
+    $info=@getimagesize($file['tmp_name']); $map=[IMAGETYPE_JPEG=>'jpg',IMAGETYPE_PNG=>'png',IMAGETYPE_WEBP=>'webp'];
+    $ext=$info&&isset($map[$info[2]??0])?$map[$info[2]]:null;
+    if(!$ext) throw new RuntimeException('Aset marketplace harus JPG, PNG, atau WEBP.');
+    $dir=__DIR__.'/../../uploads/storefront'; if(!is_dir($dir)&&!mkdir($dir,0775,true)&&!is_dir($dir)) throw new RuntimeException('Folder upload marketplace tidak dapat dibuat.');
+    $name=preg_replace('/[^a-z0-9-]+/i','-',$prefix).'-'.date('YmdHis').'-'.bin2hex(random_bytes(3)).'.'.$ext;
+    if(!move_uploaded_file($file['tmp_name'],$dir.'/'.$name)) throw new RuntimeException('Gagal menyimpan aset marketplace.');
+    return 'uploads/storefront/'.$name;
+}
 
 $courierOptions=marketplace_rajaongkir_courier_options();
 if(is_post()){
     if(!CSRF::verify()){flash('error','Token keamanan tidak valid.');legacy_redirect('admin/marketplace-settings/index.php');}
     try{
         $simple=[
-            'marketplace_site_title','marketplace_meta_description','marketplace_hero_badge','marketplace_hero_title','marketplace_hero_subtitle','marketplace_footer_description','marketplace_opening_hours','marketplace_instagram','marketplace_tiktok','marketplace_facebook','marketplace_whatsapp',
+            'marketplace_site_title','marketplace_meta_description','marketplace_hero_badge','marketplace_hero_title','marketplace_hero_subtitle','marketplace_footer_description','marketplace_opening_hours','marketplace_instagram','marketplace_tiktok','marketplace_facebook','marketplace_whatsapp','marketplace_cs_1','marketplace_cs_2','marketplace_cs_3',
             'marketplace_theme_template','marketplace_theme_preset','marketplace_theme_primary','marketplace_theme_secondary','marketplace_theme_accent',
             'marketplace_branch_id','marketplace_default_weight_gram','marketplace_default_length_cm','marketplace_default_width_cm','marketplace_default_height_cm','marketplace_points_redeem_enabled','marketplace_stock_alert_threshold','marketplace_auto_request_recommendation',
             'marketplace_store_courier_name','marketplace_store_courier_fee','marketplace_store_courier_eta','marketplace_store_courier_coverage','marketplace_store_courier_rate_mode',
             'marketplace_store_pickup_name','marketplace_store_pickup_hours','marketplace_store_pickup_instructions',
             'rajaongkir_api_key','rajaongkir_origin_id','rajaongkir_origin_label','rajaongkir_origin_province_id','rajaongkir_origin_province_name','rajaongkir_origin_city_id','rajaongkir_origin_city_name','rajaongkir_origin_district_id','rajaongkir_origin_district_name','rajaongkir_origin_subdistrict_id','rajaongkir_origin_subdistrict_name','rajaongkir_origin_zip_code',
-            'marketplace_pakasir_project','marketplace_pakasir_api_key','marketplace_pakasir_webhook_secret',
+            'marketplace_pakasir_project','marketplace_pakasir_api_key',
+            'marketplace_payment_gateway','marketplace_casaku_license_key','marketplace_casaku_webhook_secret','marketplace_casaku_expired_minutes',
             'marketplace_wa_api_token','marketplace_wa_device_id','marketplace_wa_device_name','marketplace_wa_admin_phone',
             'marketplace_delivery_environment','marketplace_delivery_api_key','marketplace_delivery_shipper_name','marketplace_delivery_shipper_phone','marketplace_delivery_shipper_email','marketplace_delivery_shipper_address','marketplace_delivery_pickup_vehicle','marketplace_delivery_label_page'
         ];
@@ -52,8 +64,6 @@ if(is_post()){
         $_POST['marketplace_wa_enabled']=(($_POST['marketplace_wa_enabled']??'off')==='on')?'on':'off';
         $_POST['marketplace_store_courier_enabled']=(($_POST['marketplace_store_courier_enabled']??'off')==='on')?'on':'off';
         $_POST['marketplace_store_pickup_enabled']=(($_POST['marketplace_store_pickup_enabled']??'off')==='on')?'on':'off';
-        $_POST['marketplace_cod_enabled']=(($_POST['marketplace_cod_enabled']??'on')==='on')?'on':'off';
-        $_POST['marketplace_store_pickup_max_days']=(string)max(0,min(14,(int)($_POST['marketplace_store_pickup_max_days']??0)));
         $pickupBranchIds=[];foreach((array)($_POST['marketplace_store_pickup_branch_ids']??[]) as $bid){$bid=(int)$bid;if($bid>0)$pickupBranchIds[$bid]=$bid;} $pickupBranchIds=array_values($pickupBranchIds);
         $_POST['marketplace_store_courier_fee']=(string)max(0,min(10000000,(int)($_POST['marketplace_store_courier_fee']??0)));
         $storeCoverage=strtolower(trim((string)($_POST['marketplace_store_courier_coverage']??'same_city')));
@@ -81,12 +91,8 @@ if(is_post()){
         mp_setting_save($db,'marketplace_theme_sync_internal',$_POST['marketplace_theme_sync_internal']);
         mp_setting_save($db,'marketplace_delivery_enabled',$_POST['marketplace_delivery_enabled']);
         mp_setting_save($db,'marketplace_wa_enabled',$_POST['marketplace_wa_enabled']);
-        mp_setting_save($db,'marketplace_order_wa_enabled',($_POST['marketplace_order_wa_enabled']??'on')==='on'?'on':'off');
-        mp_setting_save($db,'marketplace_order_wa_target',trim((string)($_POST['marketplace_order_wa_target']??'')));
         mp_setting_save($db,'marketplace_store_courier_enabled',$_POST['marketplace_store_courier_enabled']);
         mp_setting_save($db,'marketplace_store_pickup_enabled',$_POST['marketplace_store_pickup_enabled']);
-        mp_setting_save($db,'marketplace_cod_enabled',$_POST['marketplace_cod_enabled']);
-        mp_setting_save($db,'marketplace_store_pickup_max_days',$_POST['marketplace_store_pickup_max_days']);
         mp_setting_save($db,'marketplace_store_pickup_branch_ids',implode(',',array_map('intval',$pickupBranchIds)));
         foreach(array_keys(marketplace_wa_event_options()) as $evt){ $k='marketplace_wa_notify_'.$evt; mp_setting_save($db,$k,$_POST[$k]); }
         mp_setting_save($db,'rajaongkir_couriers',implode(':',$enabledCouriers));
@@ -116,7 +122,7 @@ $waReady=$v('marketplace_wa_enabled','off')==='on'&&$v('marketplace_wa_api_token
 $storeCourierReady=$v('marketplace_store_courier_enabled','off')==='on';
 $storePickupReady=$v('marketplace_store_pickup_enabled','off')==='on';
 $storePickupBranchIds=array_values(array_filter(array_map('intval',preg_split('/[,:;\s]+/',$v('marketplace_store_pickup_branch_ids',''),-1,PREG_SPLIT_NO_EMPTY)?:[])));
-$pakasirWebhook=legacy_base_url('marketplace-pakasir-webhook.php');
+$pakasirWebhook=legacy_base_url('marketplace-pakasir-webhook.php').'?token='.rawurlencode($pakasirToken);
 $cronUrl=legacy_base_url('marketplace-cron.php').'?token='.rawurlencode($cronToken);
 $deliveryWebhook=legacy_base_url('marketplace-delivery-webhook.php').'?token='.rawurlencode($deliveryToken);
 $waWebhook=legacy_base_url('marketplace-wa-webhook.php');
@@ -152,6 +158,9 @@ require_once __DIR__.'/../../layouts/admin-header.php';require_once __DIR__.'/..
 <div class="system-field full"><label>Deskripsi Footer</label><textarea name="marketplace_footer_description" rows="3"><?= e($v('marketplace_footer_description','Toko modern dengan stok terhubung POS dan pengalaman belanja yang cepat.')); ?></textarea></div>
 <div class="system-field"><label>Jam Operasional</label><input name="marketplace_opening_hours" value="<?= e($v('marketplace_opening_hours','09:00 - 21:00 WIB')); ?>"></div>
 <div class="system-field"><label>WhatsApp Marketplace</label><input name="marketplace_whatsapp" value="<?= e($v('marketplace_whatsapp')); ?>"></div>
+<div class="system-field"><label>CS Admin 1 (WhatsApp)</label><input name="marketplace_cs_1" value="<?= e($v('marketplace_cs_1')); ?>" placeholder="62812xxxx"></div>
+<div class="system-field"><label>CS Admin 2 (WhatsApp)</label><input name="marketplace_cs_2" value="<?= e($v('marketplace_cs_2')); ?>" placeholder="62812xxxx"></div>
+<div class="system-field"><label>CS Admin 3 (WhatsApp)</label><input name="marketplace_cs_3" value="<?= e($v('marketplace_cs_3')); ?>" placeholder="62812xxxx"></div>
 <div class="system-field"><label>Instagram</label><input name="marketplace_instagram" value="<?= e($v('marketplace_instagram')); ?>"></div>
 <div class="system-field"><label>TikTok</label><input name="marketplace_tiktok" value="<?= e($v('marketplace_tiktok')); ?>"></div>
 <div class="system-field"><label>Facebook</label><input name="marketplace_facebook" value="<?= e($v('marketplace_facebook')); ?>"></div>
@@ -192,18 +201,22 @@ require_once __DIR__.'/../../layouts/admin-header.php';require_once __DIR__.'/..
 <div class="system-field full"><div class="mp-region-status <?= (int)$v('rajaongkir_origin_id','0')>0?'ok':''; ?>" id="originStatus"><?= (int)$v('rajaongkir_origin_id','0')>0?'Lokasi asal aktif: '.e($v('rajaongkir_origin_label')):'Pilih wilayah asal sampai Kelurahan/Desa.'; ?></div></div>
 <div class="system-field full"><label>Ekspedisi Aktif</label><div class="mp-switch-grid"><?php foreach($courierOptions as $code=>$name): ?><label class="mp-switch"><input type="checkbox" name="courier_enabled[]" value="<?= e($code); ?>" <?= in_array($code,$enabledCouriers,true)?'checked':''; ?>><span><?= e($name); ?></span></label><?php endforeach; ?></div><small>Matikan/aktifkan ekspedisi dengan checkbox. Tidak ada lagi input kode kurir manual.</small></div>
 
+<div class="marketplace-settings-heading"><h3><i class="bi bi-shield-check"></i> CasaKu (QRIS Otomatis)</h3><p>Gateway QRIS dinamis pengganti Pakasir (sub.vapekongstore.com). Pembayaran dideteksi aplikasi listener, diverifikasi real-time. Pakasir tetap dipakai bila gateway = Pakasir.</p></div>
+<div class="system-field full"><label>Gateway Pembayaran Marketplace</label><select name="marketplace_payment_gateway"><option value="pakasir" <?= $v('marketplace_payment_gateway','pakasir')!=='casaku'?'selected':''; ?>>Pakasir</option><option value="casaku" <?= $v('marketplace_payment_gateway')==='casaku'?'selected':''; ?>>CasaKu (QRIS)</option></select><small>Pilih gateway checkout website. CasaKu hanya QRIS.</small></div>
+<div class="system-field"><label>License Key CasaKu</label><input type="password" name="marketplace_casaku_license_key" value="<?= e($v('marketplace_casaku_license_key')); ?>" autocomplete="off" placeholder="dari casaku.id/api-keys"></div>
+<div class="system-field"><label>Webhook Secret CasaKu</label><input type="password" name="marketplace_casaku_webhook_secret" value="<?= e($v('marketplace_casaku_webhook_secret')); ?>" autocomplete="off" placeholder="isikan secret dari dashboard CasaKu"></div>
+<div class="system-field"><label>Masa Berlaku QRIS (menit)</label><input type="number" name="marketplace_casaku_expired_minutes" min="1" max="1440" value="<?= e($v('marketplace_casaku_expired_minutes','15')); ?>"></div>
+<div class="system-field full"><label>Webhook URL CasaKu</label><div class="mp-copy"><input readonly value="<?= e(legacy_base_url('marketplace-casaku-webhook.php')); ?>" id="casakuWebhook"><button type="button" data-copy="#casakuWebhook">Salin</button></div><small>Isi URL ini sebagai webhook callback di dashboard CasaKu (kirim saat status paid). Diuji tanda tangan HMAC-SHA256 header X-Casaku-Signature.</small></div>
+
 <div class="marketplace-settings-heading"><h3><i class="bi bi-credit-card-2-front"></i> Pakasir Marketplace</h3><p>Credential ini khusus checkout website. Pakasir POS tetap dikelola di Pengaturan POS.</p></div>
 <div class="system-field"><label>Slug Project Marketplace</label><input name="marketplace_pakasir_project" value="<?= e($v('marketplace_pakasir_project')); ?>" autocomplete="off"></div>
-<div class="system-field"><label>API Key Marketplace (v2)</label><input type="password" name="marketplace_pakasir_api_key" value="<?= e($v('marketplace_pakasir_api_key')); ?>" autocomplete="off"></div>
-<div class="system-field full"><label>Webhook Secret Marketplace (X-Secret)</label><input type="password" name="marketplace_pakasir_webhook_secret" value="<?= e($v('marketplace_pakasir_webhook_secret')); ?>" autocomplete="off" placeholder="Secret dari detail project Pakasir"><small>Salin secret webhook dari halaman detail project Pakasir Marketplace. Endpoint v2 memverifikasi header X-Secret.</small></div>
-<div class="system-field full"><label>Webhook Pakasir Marketplace v2</label><div class="mp-copy"><input readonly value="<?= e($pakasirWebhook); ?>" id="pakasirWebhook"><button type="button" data-copy="#pakasirWebhook">Salin</button></div><small>Gunakan URL ini pada project Pakasir Marketplace. URL v2 tidak memerlukan token query; autentikasi webhook memakai X-Secret.</small></div>
+<div class="system-field"><label>API Key Marketplace</label><input type="password" name="marketplace_pakasir_api_key" value="<?= e($v('marketplace_pakasir_api_key')); ?>" autocomplete="off"></div>
+<div class="system-field full"><label>Webhook Pakasir Marketplace</label><div class="mp-copy"><input readonly value="<?= e($pakasirWebhook); ?>" id="pakasirWebhook"><button type="button" data-copy="#pakasirWebhook">Salin</button></div><small>Gunakan URL ini pada project Pakasir marketplace. Webhook POS tetap menggunakan URL POS lama.</small></div>
 <div class="system-field full"><label>Cron Expired Marketplace</label><div class="mp-copy"><input readonly value="<?= e($cronUrl); ?>" id="cronUrl"><button type="button" data-copy="#cronUrl">Salin</button></div><small>Disarankan dijalankan setiap 1 menit (maksimal 5 menit) agar expired order dan antrean WhatsApp cepat diproses.</small></div>
 
 <div class="marketplace-settings-heading"><h3><i class="bi bi-whatsapp"></i> WhatsApp Marketplace</h3><p>Notifikasi customer memakai Teknorilis WA Gateway API. Credential ini khusus marketplace dan tidak mengubah WhatsApp POS.</p></div>
 <div class="system-field"><label>Status WA Marketplace</label><select name="marketplace_wa_enabled" id="waEnabled"><option value="off" <?= $v('marketplace_wa_enabled','off')==='off'?'selected':''; ?>>Nonaktif</option><option value="on" <?= $v('marketplace_wa_enabled')==='on'?'selected':''; ?>>Aktif</option></select></div>
 <div class="system-field"><label>Nomor Admin / CS (opsional)</label><input name="marketplace_wa_admin_phone" id="waAdminPhone" value="<?= e($v('marketplace_wa_admin_phone')); ?>" placeholder="62812xxxx"><small>Dipakai untuk notifikasi pengajuan komplain/retur baru.</small></div>
-<div class="system-field"><label>Notifikasi Pesanan Masuk (Fonnte)</label><select name="marketplace_order_wa_enabled"><option value="on" <?= $v('marketplace_order_wa_enabled','on')==='on'?'selected':''; ?>>Aktif (kirim ke cabang)</option><option value="off" <?= $v('marketplace_order_wa_enabled','on')==='off'?'selected':''; ?>>Nonaktif</option></select><small>Setiap pesanan marketplace baru, nomor WhatsApp cabang pengirim otomatis menerima rincian pesanan. Pengiriman memakai <b>Fonnte</b> (token WhatsApp POS, bukan gateway marketplace).</small></div>
-<div class="system-field"><label>Nomor WA Tujuan Notifikasi (opsional)</label><input name="marketplace_order_wa_target" value="<?= e($v('marketplace_order_wa_target')); ?>" placeholder="62812xxxx, 62813xxxx"><small>Kosongkan untuk memakai nomor WhatsApp cabang pengirim. Boleh lebih dari satu nomor, pisahkan koma.</small></div>
 <div class="system-field full"><label>API Token Teknorilis WA Gateway</label><input type="password" name="marketplace_wa_api_token" id="waApiToken" value="<?= e($v('marketplace_wa_api_token')); ?>" autocomplete="off" placeholder="wag_xxx"><small>Token dari menu API di gateway.teknorilis.com. Dikirim sebagai Bearer token.</small></div>
 <div class="system-field full"><label>Device WhatsApp</label><div class="mp-copy"><select name="marketplace_wa_device_id" id="waDevice"><option value="<?= (int)$v('marketplace_wa_device_id','0'); ?>"><?= (int)$v('marketplace_wa_device_id','0')>0 ? e(($v('marketplace_wa_device_name')?:'Device').' (#'.$v('marketplace_wa_device_id').')') : 'Pilih device'; ?></option></select><button type="button" id="loadWaDevices">Muat Device</button></div><input type="hidden" name="marketplace_wa_device_name" id="waDeviceName" value="<?= e($v('marketplace_wa_device_name')); ?>"><small>Hanya device berstatus ready yang disarankan untuk produksi.</small></div>
 <div class="system-field full"><label>Event Notifikasi Customer</label><div class="mp-switch-grid"><?php foreach(marketplace_wa_event_options() as $evt=>$label): $ek='marketplace_wa_notify_'.$evt; ?><label class="mp-switch"><input type="checkbox" name="<?= e($ek); ?>" value="on" <?= $v($ek,in_array($evt,['pending_payment','paid','processing','shipped','completed','cancelled','expired','service_case'],true)?'on':'off')==='on'?'checked':''; ?>><span><?= e($label); ?></span></label><?php endforeach; ?></div></div>
@@ -216,8 +229,6 @@ require_once __DIR__.'/../../layouts/admin-header.php';require_once __DIR__.'/..
 <div class="system-field"><label>Model Tarif</label><select name="marketplace_store_courier_rate_mode"><option value="flat" <?= $v('marketplace_store_courier_rate_mode','flat')==='flat'?'selected':''; ?>>Ongkir Flat</option><option value="subdistrict" <?= $v('marketplace_store_courier_rate_mode','flat')==='subdistrict'?'selected':''; ?>>Ongkir per Kelurahan/Desa</option></select><small>Mode per Kelurahan hanya menampilkan Kurir Toko jika tujuan sudah mempunyai tarif aktif.</small></div>
 <div class="system-field"><label>Ongkir Flat</label><input type="number" name="marketplace_store_courier_fee" min="0" max="10000000" step="1000" value="<?= e($v('marketplace_store_courier_fee','10000')); ?>"><small>Dipakai hanya jika Model Tarif = Ongkir Flat.</small></div>
 <div class="system-field"><label>Estimasi Default</label><input name="marketplace_store_courier_eta" maxlength="80" value="<?= e($v('marketplace_store_courier_eta','1-3 jam')); ?>" placeholder="1-3 jam"></div>
-<div class="system-field"><label>Batas Pengambilan</label><select name="marketplace_store_pickup_max_days"><option value="0" <?= $v('marketplace_store_pickup_max_days','0')==='0'?'selected':''; ?>>Hari ini (maks jam tutup)</option><option value="1" <?= $v('marketplace_store_pickup_max_days','0')==='1'?'selected':''; ?>>1 hari</option><option value="2" <?= $v('marketplace_store_pickup_max_days','0')==='2'?'selected':''; ?>>2 hari</option><option value="3" <?= $v('marketplace_store_pickup_max_days','0')==='3'?'selected':''; ?>>3 hari</option></select><small>Pesanan Ambil di Toko wajib diambil sebelum batas ini; pesanan lewat batas ditandai merah di pesanan &amp; detail admin.</small></div>
-<div class="system-field"><label>Bayar di Tempat (COD)</label><select name="marketplace_cod_enabled"><option value="on" <?= $v('marketplace_cod_enabled','on')==='on'?'selected':''; ?>>Aktif</option><option value="off" <?= $v('marketplace_cod_enabled','off')==='off'?'selected':''; ?>>Nonaktif</option></select><small>Pelanggan bisa bayar tunai untuk <b>Ambil di Toko</b> dan <b>Kurir Toko</b>. Ekspedisi tetap QRIS/VA.</small></div>
 <div class="system-field"><label>Tarif per Kelurahan</label><a class="btn-soft" href="<?= e(legacy_base_url('admin/marketplace-courier-rates/index.php')); ?>"><i class="bi bi-geo-alt-fill"></i> Atur Tarif Kelurahan</a><small>Setiap Kelurahan/Desa bisa memiliki ongkir dan estimasi sendiri.</small></div>
 <div class="system-field full"><label>Area Layanan</label><select name="marketplace_store_courier_coverage"><option value="same_district" <?= $v('marketplace_store_courier_coverage','same_city')==='same_district'?'selected':''; ?>>Hanya kecamatan yang sama dengan toko</option><option value="same_city" <?= $v('marketplace_store_courier_coverage','same_city')==='same_city'?'selected':''; ?>>Kota/Kabupaten yang sama</option><option value="same_province" <?= $v('marketplace_store_courier_coverage')==='same_province'?'selected':''; ?>>Provinsi yang sama</option><option value="all" <?= $v('marketplace_store_courier_coverage')==='all'?'selected':''; ?>>Semua wilayah yang dipilih customer</option></select><small>Perbandingan area menggunakan wilayah asal RajaOngkir yang sudah dipilih di atas.</small></div>
 <div class="system-field full"><div class="mp-note"><b>Portal Kurir:</b> <a href="<?= e(legacy_base_url('kurir/login')); ?>" target="_blank" rel="noopener"><?= e(legacy_base_url('kurir/login')); ?></a><br>Akun kurir dibuat dari menu <b>Kurir Toko</b> di admin.</div></div>

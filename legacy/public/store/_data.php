@@ -21,15 +21,9 @@ function storefront_db(): ?PDO
 function storefront_table_exists(PDO $db, string $table): bool
 {
     try {
-        // V17.0.28 — "SHOW TABLES LIKE ?" tidak bisa di-prepare di MySQL (error 1064),
-        // sehingga helper ini dulu SELALU false dan filter brand/varian/voucher/pesanan
-        // diam-diam dilewati. Pakai information_schema yang aman.
-        $stmt = $db->prepare(
-            'SELECT COUNT(*) FROM information_schema.TABLES
-              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
-        );
+        $stmt = $db->prepare("SHOW TABLES LIKE ?");
         $stmt->execute([$table]);
-        return (int) $stmt->fetchColumn() > 0;
+        return (bool) $stmt->fetchColumn();
     } catch (Throwable $e) {
         return false;
     }
@@ -67,6 +61,10 @@ function storefront_settings(): array
         'marketplace_tiktok' => (string) setting('marketplace_tiktok', ''),
         'marketplace_facebook' => (string) setting('marketplace_facebook', ''),
         'marketplace_whatsapp' => (string) setting('marketplace_whatsapp', ''),
+        'marketplace_wa_admin_phone' => (string) setting('marketplace_wa_admin_phone', ''),
+        'marketplace_cs_1' => (string) setting('marketplace_cs_1', ''),
+        'marketplace_cs_2' => (string) setting('marketplace_cs_2', ''),
+        'marketplace_cs_3' => (string) setting('marketplace_cs_3', ''),
         'marketplace_logo' => (string) setting('marketplace_logo', ''),
         'marketplace_favicon' => (string) setting('marketplace_favicon', ''),
         'marketplace_hero_image' => (string) setting('marketplace_hero_image', ''),
@@ -83,11 +81,7 @@ function storefront_public_file_exists(string $path): bool
 {
     $path = trim($path);
     if ($path === '' || preg_match('~^https?://~i', $path)) return $path !== '';
-    $relative = function_exists('legacy_normalize_upload_path') ? legacy_normalize_upload_path($path) : ltrim($path, '/');
-    if (str_starts_with($relative, 'uploads/') && function_exists('legacy_upload_candidates')) {
-        foreach (legacy_upload_candidates($relative) as $candidate) if (is_file($candidate)) return true;
-        return false;
-    }
+    $relative = ltrim($path, '/');
     if (strpos($relative, 'public/') === 0) $relative = substr($relative, 7);
     return is_file(__DIR__ . '/../' . $relative);
 }
@@ -137,31 +131,9 @@ function storefront_category_key(?string $categoryName): string
     return 'default';
 }
 
-function storefront_category_image(?string $categoryName, ?string $image = null): string
+function storefront_category_image(?string $categoryName): string
 {
-    // V17.0.24: foto kategori dari menu Kategori (POS/admin) menggantikan icon/SVG.
-    $path = trim((string) $image);
-    if ($path === '' && $categoryName !== null && trim($categoryName) !== '') {
-        static $cache = [];
-        $key = strtolower(trim($categoryName));
-        if (!array_key_exists($key, $cache)) {
-            $cache[$key] = '';
-            $db = storefront_db();
-            if ($db) {
-                try {
-                    $st = $db->prepare('SELECT image FROM categories WHERE name = ? LIMIT 1');
-                    $st->execute([$categoryName]);
-                    $cache[$key] = trim((string) $st->fetchColumn());
-                } catch (Throwable $e) {
-                    $cache[$key] = '';
-                }
-            }
-        }
-        $path = $cache[$key];
-    }
-    $fallback = 'category-' . storefront_category_key($categoryName) . '.svg';
-    if ($path !== '') return storefront_visual_url($path, $fallback);
-    return storefront_asset_url($fallback);
+    return storefront_asset_url('category-' . storefront_category_key($categoryName) . '.svg');
 }
 
 function storefront_product_fallback(array $product): string
@@ -184,149 +156,13 @@ function storefront_categories(int $limit = 8): array
     $db = storefront_db();
     if (!$db) return [];
     try {
-        $stmt = $db->prepare("\n            SELECT c.id, c.name, c.slug, c.icon, c.description, c.image, COUNT(p.id) product_count\n            FROM categories c\n            LEFT JOIN products p ON p.category_id = c.id AND p.is_active = 1\n            WHERE c.is_active = 1\n            GROUP BY c.id, c.name, c.slug, c.icon, c.description, c.image, c.sort_order\n            ORDER BY c.sort_order ASC, c.name ASC\n            LIMIT " . max(1, min(20, $limit))
+        $stmt = $db->prepare("\n            SELECT c.id, c.name, c.slug, c.icon, c.description, COUNT(p.id) product_count\n            FROM categories c\n            LEFT JOIN products p ON p.category_id = c.id AND p.is_active = 1\n            WHERE c.is_active = 1\n            GROUP BY c.id, c.name, c.slug, c.icon, c.description, c.sort_order\n            ORDER BY c.sort_order ASC, c.name ASC\n            LIMIT " . max(1, min(20, $limit))
         );
         $stmt->execute();
         return $stmt->fetchAll() ?: [];
     } catch (Throwable $e) {
         return [];
     }
-}
-
-/**
- * V17.0.26 — jumlah total produk pada katalog (untuk pagination).
- * Filter SAMA dengan storefront_products(); dipisah supaya COUNT(*) murah.
- */
-function storefront_products_total(array $options = []): int
-{
-    $db = storefront_db();
-    if (!$db) return 0;
-
-    $category = trim((string) ($options['category'] ?? ''));
-    $search = trim((string) ($options['search'] ?? ''));
-    $brand = max(0, (int) ($options['brand'] ?? 0));
-    $hasBrandColumn = storefront_column_exists($db, 'products', 'brand_id');
-    $hasBrandTable = storefront_table_exists($db, 'marketplace_brands');
-    $hasProductMeta = marketplace_v15_product_meta_install($db);
-
-    $where = ['p.is_active = 1'];
-    $params = [];
-    $brandJoin = '';
-
-    if ($category !== '') {
-        if (ctype_digit($category)) {
-            $where[] = 'p.category_id = ?';
-            $params[] = (int) $category;
-        } else {
-            $where[] = 'c.slug = ?';
-            $params[] = $category;
-        }
-    }
-    if ($search !== '') {
-        $where[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
-        $q = '%' . $search . '%';
-        array_push($params, $q, $q, $q, $q);
-    }
-    if ($brand > 0) {
-        if ($hasBrandColumn) {
-            $where[] = 'p.brand_id = ?';
-            $params[] = $brand;
-        } elseif ($hasBrandTable && $hasProductMeta) {
-            $brandJoin = 'LEFT JOIN marketplace_product_meta pm ON pm.product_id = p.id';
-            $where[] = 'pm.brand_id = ?';
-            $params[] = $brand;
-        }
-    }
-
-    try {
-        $sql = "SELECT COUNT(*) FROM products p LEFT JOIN categories c ON c.id = p.category_id {$brandJoin} WHERE " . implode(' AND ', $where);
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        return (int) $stmt->fetchColumn();
-    } catch (Throwable $e) {
-        error_log('[storefront][count] ' . $e->getMessage());
-        return 0;
-    }
-}
-
-/**
- * V17.0.26 — HTML navigasi halaman (1, 2, 3, …) untuk katalog.
- * $query = filter aktif yang harus dipertahankan (q, category, brand, sort).
- */
-function storefront_pagination(int $page, int $pages, array $query = [], string $basePath = 'produk'): string
-{
-    if ($pages <= 1) return '';
-
-    $page = max(1, min($pages, $page));
-    $link = static function (int $p) use ($query, $basePath): string {
-        $qs = [];
-        foreach ($query as $k => $v) {
-            if ($v === null || $v === '' || $v === 0 || $v === '0') continue;
-            $qs[$k] = $v;
-        }
-        if ($p > 1) $qs['page'] = $p;
-        $url = legacy_base_url($basePath);
-        return $url . ($qs ? '?' . http_build_query($qs) : '');
-    };
-
-    $nums = [1];
-    for ($i = $page - 2; $i <= $page + 2; $i++) {
-        if ($i > 1 && $i < $pages) $nums[] = $i;
-    }
-    if ($pages > 1) $nums[] = $pages;
-    $nums = array_values(array_unique($nums));
-    sort($nums);
-
-    $html = '<nav class="catalog-pagination" aria-label="Navigasi halaman produk">';
-    if ($page > 1) {
-        $html .= '<a class="page-btn page-nav" href="' . e($link($page - 1)) . '" rel="prev" aria-label="Halaman sebelumnya"><i class="bi bi-chevron-left"></i><span>Sebelumnya</span></a>';
-    } else {
-        $html .= '<span class="page-btn page-nav disabled"><i class="bi bi-chevron-left"></i><span>Sebelumnya</span></span>';
-    }
-
-    $prev = 0;
-    foreach ($nums as $n) {
-        if ($prev > 0 && $n - $prev > 1) {
-            $html .= '<span class="page-dots" aria-hidden="true">…</span>';
-        }
-        if ($n === $page) {
-            $html .= '<span class="page-btn active" aria-current="page">' . $n . '</span>';
-        } else {
-            $html .= '<a class="page-btn" href="' . e($link($n)) . '" aria-label="Halaman ' . $n . '">' . $n . '</a>';
-        }
-        $prev = $n;
-    }
-
-    if ($page < $pages) {
-        $html .= '<a class="page-btn page-nav" href="' . e($link($page + 1)) . '" rel="next" aria-label="Halaman berikutnya"><span>Berikutnya</span><i class="bi bi-chevron-right"></i></a>';
-    } else {
-        $html .= '<span class="page-btn page-nav disabled"><span>Berikutnya</span><i class="bi bi-chevron-right"></i></span>';
-    }
-    $html .= '</nav>';
-    return $html;
-}
-
-/**
- * V17.0.30 — jumlah terjual (POS + pesanan online) untuk sort "Terlaris".
- * Mengembalikan ekspresi SQL yang aman bila tabel penjualan belum ada.
- */
-function storefront_sold_expr(PDO $db): string
-{
-    $parts = [];
-    try {
-        if (storefront_table_exists($db, 'transaction_items') && storefront_table_exists($db, 'transactions')) {
-            $parts[] = "(SELECT COALESCE(SUM(ti.qty),0) FROM transaction_items ti
-                          JOIN transactions t ON t.id = ti.transaction_id AND t.status = 'success'
-                         WHERE ti.product_id = p.id)";
-        }
-        if (storefront_table_exists($db, 'online_order_items') && storefront_table_exists($db, 'online_orders')) {
-            $parts[] = "(SELECT COALESCE(SUM(oi.qty),0) FROM online_order_items oi
-                          JOIN online_orders o ON o.id = oi.order_id
-                           AND o.order_status NOT IN ('cancelled','expired')
-                         WHERE oi.product_id = p.id)";
-        }
-    } catch (Throwable $e) {}
-    return $parts ? '(' . implode(' + ', $parts) . ')' : '0';
 }
 
 function storefront_products(array $options = []): array
@@ -383,16 +219,12 @@ function storefront_products(array $options = []): array
         }
     }
 
-    // V17.0.30 — semua urutan menaruh produk stok habis di paling bawah.
-    $outOfStockLast = 'CASE WHEN stock_total <= 0 THEN 1 ELSE 0 END ASC';
     switch ($sort) {
-        case 'best': $order = $outOfStockLast . ', ' . storefront_sold_expr($db) . ' DESC, p.name ASC'; break;
-        case 'latest': $order = $outOfStockLast . ', p.id DESC'; break;
-        case 'price_asc': $order = $outOfStockLast . ', p.selling_price ASC, p.name ASC'; break;
-        case 'price_desc': $order = $outOfStockLast . ', p.selling_price DESC, p.name ASC'; break;
-        case 'name': $order = $outOfStockLast . ', p.name ASC, p.id ASC'; break;
-        case 'stock': $order = $outOfStockLast . ', stock_total DESC, p.name ASC'; break;
-        default: $order = $outOfStockLast . ', p.name ASC, p.id ASC';
+        case 'price_asc': $order = 'CASE WHEN stock_total <= 0 THEN 1 ELSE 0 END ASC, p.selling_price ASC, p.name ASC'; break;
+        case 'price_desc': $order = 'CASE WHEN stock_total <= 0 THEN 1 ELSE 0 END ASC, p.selling_price DESC, p.name ASC'; break;
+        case 'name': $order = 'CASE WHEN stock_total <= 0 THEN 1 ELSE 0 END ASC, p.name ASC, p.id ASC'; break;
+        case 'stock': $order = 'CASE WHEN stock_total <= 0 THEN 1 ELSE 0 END ASC, stock_total DESC, p.name ASC'; break;
+        default: $order = 'CASE WHEN stock_total <= 0 THEN 1 ELSE 0 END ASC, p.name ASC, p.id ASC';
     }
 
     try {
@@ -417,20 +249,18 @@ function storefront_products(array $options = []): array
 
         $variantJoin = '';
         $variantSelect = '0 AS variant_count';
-        $stockSelect = 'COALESCE((SELECT SUM(pbs_all.stock) FROM product_branch_stocks pbs_all JOIN branches b_all ON b_all.id = pbs_all.branch_id AND b_all.is_active = 1 WHERE pbs_all.product_id = p.id), CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END, 0) AS stock_total';
+        $stockSelect = 'COALESCE(pbs.stock, CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END, 0) AS stock_total';
         if ($hasVariants && $hasVariantStocks) {
-            // V17.0.29 — stok varian dijumlahkan dari semua cabang aktif.
             $variantJoin = "LEFT JOIN (
-                SELECT v.product_id,COUNT(*) AS variant_count,
-                       SUM(CASE WHEN vb.id IS NULL THEN 0 ELSE COALESCE(vs.stock,0) END) AS variant_stock
+                SELECT v.product_id,COUNT(*) AS variant_count,SUM(COALESCE(vs.stock,0)) AS variant_stock
                 FROM marketplace_product_variants v
-                LEFT JOIN marketplace_product_variant_stocks vs ON vs.variant_id=v.id
-                LEFT JOIN branches vb ON vb.id=vs.branch_id AND vb.is_active=1
+                LEFT JOIN marketplace_product_variant_stocks vs ON vs.variant_id=v.id AND vs.branch_id=?
                 WHERE v.is_active=1
                 GROUP BY v.product_id
             ) va ON va.product_id=p.id";
             $variantSelect = 'COALESCE(va.variant_count,0) AS variant_count';
-            $stockSelect = 'CASE WHEN COALESCE(va.variant_count,0)>0 THEN COALESCE(va.variant_stock,0) ELSE COALESCE((SELECT SUM(pbs_all.stock) FROM product_branch_stocks pbs_all JOIN branches b_all ON b_all.id = pbs_all.branch_id AND b_all.is_active = 1 WHERE pbs_all.product_id = p.id), CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END,0) END AS stock_total';
+            $stockSelect = 'CASE WHEN COALESCE(va.variant_count,0)>0 THEN COALESCE(va.variant_stock,0) ELSE COALESCE(pbs.stock, CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END,0) END AS stock_total';
+            $params[] = $branchId;
         } elseif ($hasVariants) {
             $variantJoin = "LEFT JOIN (
                 SELECT v.product_id,COUNT(*) AS variant_count
@@ -549,28 +379,6 @@ function storefront_effective_stock(array $product): int
     return max(0, (int)($product['stock_total'] ?? $product['stock'] ?? 0));
 }
 
-/**
- * V17.0.29 — total stok semua varian aktif dari SEMUA cabang aktif.
- * Dipakai katalog/detail (stok tampil = gabungan cabang), sedangkan pemotongan stok
- * tetap per cabang saat checkout (marketplace_cart menerima branchId).
- */
-function storefront_variant_stock_total(int $productId): int
-{
-    $db = storefront_db();
-    if (!$db || $productId <= 0) return 0;
-    try {
-        $s = $db->prepare("SELECT COALESCE(SUM(vs.stock),0)
-                             FROM marketplace_product_variants v
-                             JOIN marketplace_product_variant_stocks vs ON vs.variant_id = v.id
-                             JOIN branches b ON b.id = vs.branch_id AND b.is_active = 1
-                            WHERE v.product_id = ? AND v.is_active = 1");
-        $s->execute([$productId]);
-        return max(0, (int) $s->fetchColumn());
-    } catch (Throwable $e) {
-        return 0;
-    }
-}
-
 function storefront_product(int $id): ?array
 {
     if ($id <= 0) return null;
@@ -585,7 +393,7 @@ function storefront_product(int $id): ?array
     // Fetch the core POS product first. V15 extras must never make a valid POS
     // product look "missing" just because an additive migration is incomplete.
     try {
-        $stmt = $db->prepare("SELECT p.id,p.category_id,p.product_code,p.barcode,p.name,p.description,p.image,p.selling_price,p.stock,p.unit,{$weightExpr} AS weight_gram,p.created_at,c.name category_name,c.slug category_slug,c.icon category_icon,COALESCE((SELECT SUM(pbs_all.stock) FROM product_branch_stocks pbs_all JOIN branches b_all ON b_all.id = pbs_all.branch_id AND b_all.is_active = 1 WHERE pbs_all.product_id = p.id),CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END,0) stock_total FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN branches b ON b.id=? LEFT JOIN product_branch_stocks pbs ON pbs.product_id=p.id AND pbs.branch_id=b.id WHERE p.id=? AND p.is_active=1 LIMIT 1");
+        $stmt = $db->prepare("SELECT p.id,p.category_id,p.product_code,p.barcode,p.name,p.description,p.image,p.selling_price,p.stock,p.unit,{$weightExpr} AS weight_gram,p.created_at,c.name category_name,c.slug category_slug,c.icon category_icon,COALESCE(pbs.stock,CASE WHEN b.is_main=1 THEN p.stock ELSE 0 END,0) stock_total FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN branches b ON b.id=? LEFT JOIN product_branch_stocks pbs ON pbs.product_id=p.id AND pbs.branch_id=b.id WHERE p.id=? AND p.is_active=1 LIMIT 1");
         $stmt->execute([$branchId, $id]);
         $row = $stmt->fetch() ?: null;
     } catch (Throwable $e) {
@@ -629,7 +437,7 @@ function storefront_product(int $id): ?array
             $vc = $db->prepare("SELECT COUNT(*) FROM marketplace_product_variants WHERE product_id=? AND is_active=1");
             $vc->execute([(int) $row['id']]);
             $row['variant_count'] = (int) $vc->fetchColumn();
-            if($row['variant_count']>0) $row['stock_total']=storefront_variant_stock_total((int)$row['id']);
+            if($row['variant_count']>0) $row['stock_total']=marketplace_v16_product_variant_stock_total($db,(int)$row['id'],$branchId,true);
         } catch (Throwable $e) {}
     }
 
@@ -682,29 +490,10 @@ function storefront_stats(): array
     try { $stats['products'] = (int) $db->query("SELECT COUNT(*) FROM products WHERE is_active = 1")->fetchColumn(); } catch (Throwable $e) {}
     try { $stats['customers'] = (int) $db->query("SELECT COUNT(*) FROM customers")->fetchColumn(); } catch (Throwable $e) {}
     try { $stats['branches'] = (int) $db->query("SELECT COUNT(*) FROM branches WHERE is_active = 1")->fetchColumn(); } catch (Throwable $e) {}
-    // V17.0.28 — angka "Pesanan" diambil dari data nyata: pesanan web (bukan yang dibatalkan)
-    // ditambah transaksi kasir yang sukses. Pesanan web yang sudah dicatat ke POS
-    // (transactions.reference_type = 'online_order') tidak dihitung dua kali.
     try {
-        $stats['orders_online'] = 0;
-        $stats['orders_pos'] = 0;
         if (storefront_table_exists($db, 'online_orders')) {
-            try {
-                $stats['orders_online'] = (int) $db->query(
-                    "SELECT COUNT(*) FROM online_orders WHERE COALESCE(order_status, '') <> 'cancelled'"
-                )->fetchColumn();
-            } catch (Throwable $e) {
-                $stats['orders_online'] = (int) $db->query("SELECT COUNT(*) FROM online_orders")->fetchColumn();
-            }
+            $stats['orders'] = (int) $db->query("SELECT COUNT(*) FROM online_orders")->fetchColumn();
         }
-        try {
-            $stats['orders_pos'] = (int) $db->query(
-                "SELECT COUNT(*) FROM transactions
-                  WHERE status = 'success'
-                    AND (reference_type IS NULL OR reference_type <> 'online_order')"
-            )->fetchColumn();
-        } catch (Throwable $e) {}
-        $stats['orders'] = $stats['orders_online'] + $stats['orders_pos'];
     } catch (Throwable $e) {}
     return $stats;
 }
@@ -785,28 +574,7 @@ function storefront_product_gallery(int $productId): array
 }
 function storefront_product_variants(int $productId): array
 {
-    $db=storefront_db();if(!$db)return [];
-    try{
-        $rows=marketplace_v15_variants($db,$productId,marketplace_branch_id($db),true);
-        // V17.0.29 — stok tiap varian = jumlah semua cabang aktif (pemotongan tetap per cabang saat checkout).
-        $agg=[];
-        try{
-            $s=$db->prepare("SELECT vs.variant_id,COALESCE(SUM(vs.stock),0) AS stock_all
-                               FROM marketplace_product_variant_stocks vs
-                               JOIN marketplace_product_variants v ON v.id=vs.variant_id AND v.product_id=?
-                               JOIN branches b ON b.id=vs.branch_id AND b.is_active=1
-                              GROUP BY vs.variant_id");
-            $s->execute([$productId]);
-            foreach($s->fetchAll()?:[] as $r){$agg[(int)$r['variant_id']]=(int)$r['stock_all'];}
-        }catch(Throwable $e){}
-        foreach($rows as &$v){
-            if(array_key_exists((int)$v['id'],$agg))$v['stock']=$agg[(int)$v['id']];
-            $eff=marketplace_v15_effective_price($db,$productId,(float)$v['selling_price'],(int)$v['id']);
-            $v['original_selling_price']=$eff['normal_price'];$v['selling_price']=$eff['price'];$v['flash_sale']=$eff['flash'];
-        }
-        unset($v);
-        return $rows;
-    }catch(Throwable $e){return [];}
+    $db=storefront_db();if(!$db)return [];try{$rows=marketplace_v15_variants($db,$productId,marketplace_branch_id($db),true);foreach($rows as &$v){$eff=marketplace_v15_effective_price($db,$productId,(float)$v['selling_price'],(int)$v['id']);$v['original_selling_price']=$eff['normal_price'];$v['selling_price']=$eff['price'];$v['flash_sale']=$eff['flash'];}unset($v);return $rows;}catch(Throwable $e){return [];}
 }
 function storefront_flash_products(int $limit=8): array
 {

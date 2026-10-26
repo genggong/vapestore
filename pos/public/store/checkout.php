@@ -12,7 +12,7 @@ $pickupReady = $db && !empty($pickupConfig['enabled']);
 $paymentReady = $db && $payConfig['project'] !== '' && $payConfig['api_key'] !== '';
 $codEnabled = ($db && function_exists('marketplace_cod_enabled')) ? marketplace_cod_enabled() : false;
 $checkoutReady = ($paymentReady || $codEnabled) && ($deliveryReady || $pickupReady);
-$paymentMethods = marketplace_pakasir_methods();
+$paymentMethods = function_exists('marketplace_payment_methods') ? marketplace_payment_methods() : marketplace_pakasir_methods();
 $customer = $db ? marketplace_customer($db) : null;
 $savedAddresses = ($db && $customer) ? marketplace_customer_addresses($db, (int)$customer['id']) : [];
 $pointsAvailable = (int)($customer['points'] ?? 0);

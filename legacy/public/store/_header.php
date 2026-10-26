@@ -35,14 +35,8 @@ $storeFavicon = storefront_visual_url($store['marketplace_favicon'] ?? '', 'favi
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="<?= legacy_base_url('assets/css/storefront.css?v=' . (defined('APP_ASSET_VERSION') ? APP_ASSET_VERSION : '17.0.27')); ?>" rel="stylesheet">
-    <link href="<?= legacy_base_url('assets/css/marketplace-theme.css?v=' . (defined('APP_ASSET_VERSION') ? APP_ASSET_VERSION : '17.0.27')); ?>" rel="stylesheet">
-    <style>
-      .store-brand-text-fallback{display:none;font-weight:900;font-size:20px;letter-spacing:-.5px;color:#151827;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .store-brand.logo-broken .store-brand-text-fallback{display:block}
-      .store-brand.logo-broken .store-logo-image{display:none!important}
-    </style>
-    <noscript><style>.reveal{opacity:1!important;transform:none!important}</style></noscript>
+    <link href="<?= legacy_base_url('assets/css/storefront.css?v=15.14.1'); ?>" rel="stylesheet">
+    <link href="<?= legacy_base_url('assets/css/marketplace-theme.css?v=15.8.0'); ?>" rel="stylesheet">
 </head>
 <body class="storefront-body theme-template-<?= e($marketplaceTheme['template']); ?> theme-preset-<?= e($marketplaceTheme['preset']); ?> <?= e(trim((string)($bodyClass ?? ''))); ?>" data-store-name="<?= e($store['store_name']); ?>" data-wishlist-url="<?= e(legacy_base_url('store/api/wishlist-toggle.php')); ?>" data-marketplace-auth="<?= $storeCustomerId > 0 ? '1' : '0'; ?>" data-login-url="<?= e(legacy_base_url('masuk')); ?>" data-csrf="<?= e(CSRF::token()); ?>">
 <div class="store-page-loader" id="storePageLoader" aria-hidden="true">
@@ -70,8 +64,7 @@ $storeFavicon = storefront_visual_url($store['marketplace_favicon'] ?? '', 'favi
 <header class="store-header" id="storeHeader">
     <div class="store-container store-header-inner">
         <a class="store-brand" href="<?= legacy_base_url(); ?>" aria-label="<?= e($store['store_name']); ?>">
-            <img class="store-logo-image" src="<?= e($storeLogo); ?>" alt="<?= e($store['store_name']); ?>" onerror="var a=this.closest('.store-brand');if(!this.dataset.fallbackTried){this.dataset.fallbackTried='1';this.src='<?= e(storefront_asset_url('logo-vapekong.svg')); ?>';}else{if(a)a.classList.add('logo-broken');this.style.display='none';}">
-            <span class="store-brand-text-fallback"><?= e($store['store_name']); ?></span>
+            <img class="store-logo-image" src="<?= e($storeLogo); ?>" alt="<?= e($store['store_name']); ?>" onerror="this.onerror=null;this.src='<?= e(storefront_asset_url('logo-vapekong.svg')); ?>';">
         </a>
         <button class="mobile-menu-btn" type="button" id="storeMenuToggle" aria-label="Buka menu" aria-controls="storeNav" aria-expanded="false"><i class="bi bi-list"></i></button>
         <nav class="store-nav" id="storeNav">
