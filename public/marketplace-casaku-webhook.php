@@ -36,6 +36,25 @@ try {
     $rawBody = (string) file_get_contents('php://input');
     $sig = casaku_header('X-Casaku-Signature');
 
+    // V17.0.51 — log diagnostik 403 untuk telusuri kenapa webhook ditolak.
+    $dbgLine = sprintf(
+        "[%s] sig_in=%s secret_set=%s|len=%d body_len=%d headers=%s",
+        date('Y-m-d H:i:s'),
+        $sig !== '' ? substr($sig, 0, 16) . '…' : '(kosong)',
+        $secret !== '' ? 'ya' : 'TIDAK',
+        strlen($secret),
+        strlen($rawBody),
+        json_encode(array_keys(array_change_key_case(isset($_SERVER) ? $_SERVER : [], CASE_LOWER)) ?: [])
+    );
+    if ($secret !== '' && $sig !== '') {
+        $dbgLine .= ' computed=' . substr(hash_hmac('sha256', $rawBody, $secret), 0, 16) . '…';
+    }
+    try {
+        $logDir = dirname(__DIR__) . '/writable/logs';
+        if (!is_dir($logDir)) @mkdir($logDir, 0775, true);
+        @file_put_contents($logDir . '/casaku-webhook.log', $dbgLine . "\n", FILE_APPEND);
+    } catch (Throwable $e) {}
+
     if ($secret === '') {
         casaku_webhook_out(['success' => false, 'message' => 'Webhook Secret Casaku belum diatur.'], 403);
     }
