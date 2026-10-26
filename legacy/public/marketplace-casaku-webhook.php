@@ -74,7 +74,12 @@ try {
     $st = $db->prepare("SELECT * FROM online_orders WHERE payment_txn_id=? LIMIT 1");
     $st->execute([$txnId]);
     $order = $st->fetch();
-    if (!$order) casaku_webhook_out(['success' => false, 'message' => 'Pesanan tidak ditemukan.'], 404);
+    // V17.0.52 — request asli (signature lolos) tapi txn tidak ada di DB (test webhook /
+    // ping verifikasi endpoint Casaku) tetap harus balas 200 agar verifikasi dashboard
+    // Casaku lolos & retry berhenti. Tidak perlu 404.
+    if (!$order) {
+        casaku_webhook_out(['success' => true, 'message' => 'Webhook diterima (transaksi tidak dikenal, diabaikan).']);
+    }
 
     if ($status === 'paid') {
         $expected = (int) round((float) ($order['payment_amount'] ?: $order['grand_total']));
