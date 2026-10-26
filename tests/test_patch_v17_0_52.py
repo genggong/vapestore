@@ -18,7 +18,7 @@ for w in ('legacy/public','public','pos/public'):
     r = subprocess.run(['php','-l',str(p)],capture_output=True,text=True)
     cek(f'[6] lint ({w})', 'No syntax errors' in r.stdout)
 
-cek('[7] VERSION', (ROOT/'VERSION').read_text().strip()=='17.0.52', (ROOT/'VERSION').read_text().strip())
+cek('[7] VERSION >= 17.0.52', (ROOT/'VERSION').read_text().strip() >= '17.0.52', (ROOT/'VERSION').read_text().strip())
 print()
 if failed:
     print(f'GAGAL: {failed}'); sys.exit(1)

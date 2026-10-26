@@ -14,7 +14,8 @@ function marketplace_casaku_config(PDO $db = null): array
         'license_key' => trim((string) setting('marketplace_casaku_license_key', '')),
         'webhook_secret' => trim((string) setting('marketplace_casaku_webhook_secret', '')),
         'expired_minutes' => max(1, min(1440, (int) setting('marketplace_casaku_expired_minutes', '15'))),
-        'base_url' => trim((string) setting('marketplace_casaku_base_url', 'https://api.casaku.id')),
+        'qr_id' => trim((string) setting('marketplace_casaku_qr_id', '')),
+        'base_url' => 'https://api.casaku.id',
     ];
 }
 
@@ -57,6 +58,7 @@ function marketplace_casaku_create(PDO $db, string $orderId, int $amount, string
     if ($method !== 'qris') throw new InvalidArgumentException('CasaKu hanya mendukung metode QRIS.');
     $config = marketplace_casaku_config($db);
     if ($config['license_key'] === '') throw new RuntimeException('License Key CasaKu belum diatur di Pengaturan Marketplace.');
+    if ($config['qr_id'] === '') throw new RuntimeException('QRIS Merchant ID belum diatur di Pengaturan Marketplace (Marketplace Settings → CasaKu).');
     if ($amount <= 0) throw new InvalidArgumentException('Nominal pembayaran tidak valid.');
 
     $json = marketplace_http_json($config['base_url'] . '/api/generate/v2/qris', 'POST', [
@@ -64,7 +66,7 @@ function marketplace_casaku_create(PDO $db, string $orderId, int $amount, string
         'Content-Type: application/json',
         'x-license-key: ' . $config['license_key'],
     ], [
-        'qr_id' => $orderId,
+        'qr_id' => $config['qr_id'],
         'amount' => $amount,
         'useUniqueCode' => false,
         'packageIds' => [],
