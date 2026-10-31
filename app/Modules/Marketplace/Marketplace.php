@@ -1431,7 +1431,6 @@ function marketplace_order_notify_message(PDO $db, array $order): string
     } catch (Throwable $e) {
         $lines[count($lines) - 1] = 'Waktu: ' . date('d/m/Y H:i');
     }
-
     if (strtolower((string) ($order['courier_code'] ?? '')) === 'pickup' && !empty($order['pickup_deadline_at'])) {
         $dl = strtotime((string) $order['pickup_deadline_at']);
         if ($dl) $lines[] = 'Batas ambil: ' . date('d/m/Y H:i', $dl);
@@ -1626,6 +1625,20 @@ function marketplace_create_order(PDO $db, array $payload): array
     $shippingDiscount = !empty($voucherPreview['voucher']) ? marketplace_v15_shipping_discount($voucherPreview['voucher'], $shippingCost, (string)$selected['code']) : 0.0;
     $customerId = marketplace_customer_id();
     if ($customerId > 0 && !marketplace_customer($db)) $customerId = 0;
+    // V17.0.54 — GUEST checkout: tautkan nomor HP ke member (jika sudah terdaftar) atau
+    // buatkan member otomatis (password default vapekong123) bila nomor belum terdaftar.
+    if ($customerId <= 0 && $recipientPhone !== '') {
+        $memberStmt = $db->prepare("SELECT id,name,email FROM customers WHERE status='active' AND phone=? AND TRIM(COALESCE(phone,''))<>'' ORDER BY id LIMIT 1");
+        $memberStmt->execute([$recipientPhone]);
+        $member = $memberStmt->fetch();
+        if ($member) {
+            $customerId = (int) $member['id']; // tautkan transaksi ke member yang sudah ada
+        } else {
+            $db->prepare("INSERT INTO customers (name,email,phone,marketplace_password_hash,status,created_at) VALUES (?,?,?,?,'active',NOW())")
+                ->execute([$recipientName !== '' ? $recipientName : 'Member Marketplace', $recipientEmail !== '' ? $recipientEmail : null, $recipientPhone, password_hash('vapekong123', PASSWORD_DEFAULT)]);
+            $customerId = (int) $db->lastInsertId();
+        }
+    }
     $pointsRequested = max(0, (int)($payload['points_to_use'] ?? 0));
     $pointsPreview = marketplace_v15_points_preview($db, $customerId, $pointsRequested, max(0,$subtotal-$discount), false);
     $pointsDiscount = (float)$pointsPreview['discount'];
