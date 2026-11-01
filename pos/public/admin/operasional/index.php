@@ -107,7 +107,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
                     </div>
                     <div class="form-group">
                         <label>Nominal (Rp)</label>
-                        <input type="number" name="amount" min="1" step="1000" required placeholder="cth: 150000">
+                        <input type="number" name="amount" min="1" step="1" required placeholder="cth: 150000">
                     </div>
                     <div class="form-group">
                         <label>Keterangan</label>
