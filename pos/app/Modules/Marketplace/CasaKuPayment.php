@@ -69,7 +69,7 @@ function marketplace_casaku_create(PDO $db, string $orderId, int $amount, string
         'qr_id' => $config['qr_id'],
         'amount' => $amount,
         'useUniqueCode' => false,
-        'packageIds' => [],
+        'packageIds' => ['com.bca.msb'],
         'expiredInMinutes' => $config['expired_minutes'],
         'qrType' => 'dynamic',
         'paymentMethod' => 'qris',
