@@ -13,20 +13,19 @@ if(is_post()){
             $db->prepare('DELETE FROM marketplace_store_courier_rates WHERE id=?')->execute([$id]);
             flash('success','Tarif kelurahan dihapus.');
         }else{
-            $province=trim((string)($_POST['province_name']??''));$city=trim((string)($_POST['city_name']??''));$district=trim((string)($_POST['district_name']??''));$subdistrict=trim((string)($_POST['subdistrict_name']??''));
-            if($province===''||$city===''||$district===''||$subdistrict==='')throw new InvalidArgumentException('Pilih wilayah sampai Kelurahan/Desa.');
-            $resolved=marketplace_rajaongkir_resolve_direct_destination($subdistrict,$district,$city,trim((string)($_POST['postal_code']??'')));
-            $destinationId=(int)($resolved['id']??0);if($destinationId<=0)throw new RuntimeException('Kelurahan belum dapat dipetakan ke ID tujuan ongkir.');
             $fee=max(0,(float)($_POST['fee']??0));$eta=trim((string)($_POST['eta']??''));$active=isset($_POST['is_active'])?1:0;$sort=(int)($_POST['sort_order']??0);
             $branchId=max(0,(int)($_POST['branch_id']??0));
             $rateId=max(0,(int)($_POST['id']??0));
             if($rateId>0){
-                // Edit per kelurahan (by id) — region tetap, hanya ongkir/ETA/status/urutan berubah.
+                // Edit per kelurahan (by id) — region tetap, hanya ongkir/ETA/status/urutan/cabang berubah.
                 $s=$db->prepare("UPDATE marketplace_store_courier_rates SET fee=?,eta=?,is_active=?,sort_order=?,branch_id=?,updated_at=NOW() WHERE id=?");
                 $s->execute([$fee,$eta?:null,$active,$sort,$branchId,$rateId]);
-                if($s->rowCount()===0) throw new RuntimeException('Tarif tidak ditemukan.');
-                flash('success','Tarif '.$subdistrict.' diperbarui.');
+                flash('success','Tarif berhasil diperbarui.');
             }else{
+                $province=trim((string)($_POST['province_name']??''));$city=trim((string)($_POST['city_name']??''));$district=trim((string)($_POST['district_name']??''));$subdistrict=trim((string)($_POST['subdistrict_name']??''));
+                if($province===''||$city===''||$district===''||$subdistrict==='')throw new InvalidArgumentException('Pilih wilayah sampai Kelurahan/Desa.');
+                $resolved=marketplace_rajaongkir_resolve_direct_destination($subdistrict,$district,$city,trim((string)($_POST['postal_code']??'')));
+                $destinationId=(int)($resolved['id']??0);if($destinationId<=0)throw new RuntimeException('Kelurahan belum dapat dipetakan ke ID tujuan ongkir.');
                 $sql="INSERT INTO marketplace_store_courier_rates(branch_id,destination_id,province_id,city_id,district_id,subdistrict_id,province,city,district,subdistrict,postal_code,fee,eta,is_active,sort_order,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW()) ON DUPLICATE KEY UPDATE province_id=VALUES(province_id),city_id=VALUES(city_id),district_id=VALUES(district_id),subdistrict_id=VALUES(subdistrict_id),province=VALUES(province),city=VALUES(city),district=VALUES(district),subdistrict=VALUES(subdistrict),postal_code=VALUES(postal_code),fee=VALUES(fee),eta=VALUES(eta),is_active=VALUES(is_active),sort_order=VALUES(sort_order),updated_at=NOW()";
                 $db->prepare($sql)->execute([$branchId,$destinationId,(int)($_POST['province_id']??0),(int)($_POST['city_id']??0),(int)($_POST['district_id']??0),(int)($_POST['subdistrict_id']??0),$province,$city,$district,$subdistrict,(string)($resolved['zip_code']??''),$fee,$eta?:null,$active,$sort]);
                 flash('success','Tarif '.$subdistrict.' berhasil disimpan.');
