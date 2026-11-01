@@ -51,7 +51,7 @@ const fillEdit=(btn)=>{const data=JSON.parse(btn.closest('tr').dataset.edit);doc
 document.getElementById('provinceName').value=data.province;document.getElementById('cityName').value=data.city;document.getElementById('districtName').value=data.district;document.getElementById('subdistrictName').value=data.subdistrict;document.getElementById('postalCode').value='';
 const setOne=(el,label,val)=>{el.innerHTML='<option value="'+(val||'')+'">'+(label||'')+'</option>';const opt=el.querySelector('option');if(opt)opt.selected=true;el.disabled=false;};
 const p2=document.getElementById('rateProvince'),c2=document.getElementById('rateCity'),d2=document.getElementById('rateDistrict'),s2=document.getElementById('rateSubdistrict');
-setOne(p2,data.province,'');setOne(c2,data.city,data.city_id);setOne(d2,data.district,data.district_id);setOne(s2,data.subdistrict,data.subdistrict_id);
+setOne(p2,data.province,data.province_id);setOne(c2,data.city,data.city_id);setOne(d2,data.district,data.district_id);setOne(s2,data.subdistrict,data.subdistrict_id);
 document.querySelector('input[name=fee]').value=parseFloat(data.fee)||0;document.querySelector('input[name=eta]').value=data.eta||'';document.querySelector('input[name=sort_order]').value=data.sort_order||0;
 const chk=document.querySelector('input[name=is_active]');chk.checked=!!data.is_active;
 document.getElementById('editBanner').style.display='block';document.getElementById('rateForm').scrollIntoView({behavior:'smooth'});};
