@@ -13,6 +13,7 @@ $paymentReady = $db && $payConfig['project'] !== '' && $payConfig['api_key'] !==
 $codEnabled = ($db && function_exists('marketplace_cod_enabled')) ? marketplace_cod_enabled() : false;
 $checkoutReady = ($paymentReady || $codEnabled) && ($deliveryReady || $pickupReady);
 $paymentMethods = function_exists('marketplace_payment_methods') ? marketplace_payment_methods() : marketplace_pakasir_methods();
+$isCasaku = (function_exists('marketplace_payment_gateway') ? marketplace_payment_gateway() : 'pakasir') === 'casaku';
 $customer = $db ? marketplace_customer($db) : null;
 $savedAddresses = ($db && $customer) ? marketplace_customer_addresses($db, (int)$customer['id']) : [];
 $pointsAvailable = (int)($customer['points'] ?? 0);
@@ -142,6 +143,7 @@ require __DIR__ . '/_header.php';
                         <i class="bi bi-check-circle-fill payment-check"></i>
                     </label>
                     <?php endif; ?>
+                    <?php if (!$isCasaku): ?>
                     <label class="payment-method-card">
                         <input type="radio" name="payment_method" value="bri_va">
                         <span class="payment-icon"><i class="bi bi-bank"></i></span>
@@ -164,6 +166,7 @@ require __DIR__ . '/_header.php';
                         </select></span>
                         <i class="bi bi-check-circle-fill payment-check"></i>
                     </label>
+                    <?php endif; ?>
                 </div>
                 <p class="checkout-cod-note" data-cod-note hidden><i class="bi bi-info-circle"></i> COD hanya untuk <b>Ambil di Toko</b> atau <b>Kurir Toko</b>. Untuk ekspedisi, gunakan QRIS / Virtual Account.</p>
             </section>

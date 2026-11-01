@@ -21,8 +21,8 @@ function marketplace_casaku_config(PDO $db = null): array
 
 function marketplace_payment_gateway(): string
 {
-    $g = strtolower(trim((string) setting('marketplace_payment_gateway', 'pakasir')));
-    return in_array($g, ['pakasir', 'casaku'], true) ? $g : 'pakasir';
+    $g = strtolower(trim((string) setting('marketplace_payment_gateway', 'casaku')));
+    return in_array($g, ['pakasir', 'casaku'], true) ? $g : 'casaku';
 }
 
 /** Metode pembayaran yg tersedia sesuai gateway aktif. */
