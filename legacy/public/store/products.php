@@ -47,8 +47,6 @@ require __DIR__ . '/_header.php';
                 <option value="price_desc" <?= $sort === 'price_desc' ? 'selected' : ''; ?>>Harga Tertinggi</option>
                 <option value="stock" <?= $sort === 'stock' ? 'selected' : ''; ?>>Stok Terbanyak</option>
             </select>
-            <button type="submit" class="btn-primary-store"><i class="bi bi-funnel"></i> Terapkan</button>
-            <?php if ($q !== '' || $category !== '' || $brand>0 || $sort !== 'latest'): ?><a class="btn-soft" href="<?= legacy_base_url('produk'); ?>"><i class="bi bi-arrow-counterclockwise"></i> Reset</a><?php endif; ?>
         </form>
     </section>
     <section class="store-container catalog-content">

@@ -219,9 +219,7 @@ function storefront_products_total(array $options = []): int
         }
     }
     if ($search !== '') {
-        $where[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
-        $q = '%' . $search . '%';
-        array_push($params, $q, $q, $q, $q);
+        $where[] = storefront_search_clause($search, $params);
     }
     if ($brand > 0) {
         if ($hasBrandColumn) {
@@ -325,6 +323,24 @@ function storefront_sold_expr(PDO $db): string
     return $parts ? '(' . implode(' + ', $parts) . ')' : '0';
 }
 
+/**
+ * V17.0.64 — search multi-token. "3ml 0.6" cocok bila tiap kata ada minimal di satu kolom
+ * (nama/kode/desc/kategori). AND antar kata, OR antar kolom. Mengisi $params.
+ */
+function storefront_search_clause(string $search, array &$params, array $columns = []): string
+{
+    if ($search === '') return '';
+    if (!$columns) $columns = ['p.name', 'p.product_code', 'p.description', 'c.name'];
+    $terms = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY) ?: [$search];
+    $groups = [];
+    foreach ($terms as $t) {
+        $q = '%' . $t . '%';
+        $groups[] = '(' . implode(' OR ', array_map(static fn($c) => "$c LIKE ?", $columns)) . ')';
+        foreach ($columns as $_) $params[] = $q;
+    }
+    return '(' . implode(' AND ', $groups) . ')';
+}
+
 function storefront_products(array $options = []): array
 {
     $db = storefront_db();
@@ -357,9 +373,7 @@ function storefront_products(array $options = []): array
     }
 
     if ($search !== '') {
-        $where[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
-        $q = '%' . $search . '%';
-        array_push($params, $q, $q, $q, $q);
+        $where[] = storefront_search_clause($search, $params);
     }
 
     // Brand filtering supports both the legacy products.brand_id column and the
@@ -423,9 +437,7 @@ function storefront_products(array $options = []): array
                 }
             }
             if ($search !== '') {
-                $fallbackWhere[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
-                $q = '%' . $search . '%';
-                array_push($fallbackParams, $q, $q, $q, $q);
+                $fallbackWhere[] = storefront_search_clause($search, $fallbackParams);
             }
             if ($brand > 0) {
                 if ($hasBrandColumn) {
