@@ -27,6 +27,42 @@ $pageQuery = ['q' => $q, 'category' => $category, 'brand' => $brand > 0 ? $brand
 $categories = storefront_categories(20);
 $brands = storefront_brands(50);
 $wishlistIds = storefront_wishlist_ids();
+
+// V17.0.66: mode AJAX — ?ajax=1 (atau header X-Requested-With) mengembalikan JSON bagian katalog.
+$ajax = (($_GET['ajax'] ?? '') === '1') || (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
+
+// Konten katalog (hasil + grid + pagination) — dipakai utuh oleh halaman dan oleh respon AJAX.
+$renderCatalog = static function () use ($products, $totalProducts, $shownFrom, $shownTo, $page, $totalPages, $pageQuery, $wishlistIds) {
+?>
+        <div class="catalog-result-head"><div><span class="eyebrow">HASIL KATALOG</span><h2><?= (int)$totalProducts; ?> Produk ditemukan</h2><?php if($totalProducts>0): ?><p class="catalog-range">Menampilkan <?= (int)$shownFrom; ?>–<?= (int)$shownTo; ?> dari <?= (int)$totalProducts; ?> produk • halaman <?= (int)$page; ?>/<?= (int)$totalPages; ?></p><?php endif; ?></div><span class="catalog-sync"><i class="bi bi-arrow-repeat"></i> Sinkron POS</span></div>
+        <div class="product-grid catalog-grid">
+            <?php if ($products): foreach ($products as $i => $product): $img = storefront_product_image($product); $fallbackImg = storefront_product_fallback($product); $stock = storefront_effective_stock($product); ?>
+                <article class="product-card">
+                    <div class="product-media"><button class="wish-btn <?= in_array((int)$product['id'], $wishlistIds, true) ? 'active' : ''; ?>" type="button" data-product-id="<?= (int)$product['id']; ?>"><i class="bi <?= in_array((int)$product['id'], $wishlistIds, true) ? 'bi-heart-fill' : 'bi-heart'; ?>"></i></button><a href="<?= e(storefront_product_url($product)); ?>"><img src="<?= e($img); ?>" data-fallback="<?= e($fallbackImg); ?>" onerror="this.onerror=null;this.src=this.dataset.fallback;" alt="<?= e($product['name']); ?>" loading="lazy"></a></div>
+                    <div class="product-info"><span class="product-category"><?= e($product['category_name'] ?: 'Produk'); ?></span><h3><a class="product-title-link" href="<?= e(storefront_product_url($product)); ?>"><?= e($product['name']); ?></a></h3><div class="rating"><i class="bi bi-star-fill"></i><span>Detail</span><small>Lihat produk</small></div><div class="product-bottom"><div><strong><?= rupiah($product['selling_price']); ?></strong><?php if((float)($product['original_selling_price']??0)>(float)$product['selling_price']):?><span class="flash-old-price"><?=rupiah($product['original_selling_price'])?></span><?php endif;?><span class="stock-badge <?= $stock <= 0 ? 'out' : ''; ?>"><?= $stock > 0 ? 'Stok ' . $stock : 'Habis'; ?></span></div><?php if((int)($product['variant_count']??0)>0):?><a class="add-cart-btn" href="<?=e(storefront_product_url($product))?>" title="Pilih varian"><i class="bi bi-sliders"></i><span>Pilih Varian</span></a><?php else:?><button class="add-cart-btn" type="button" data-product="<?= storefront_product_json($product); ?>" <?= $stock <= 0 ? 'disabled' : ''; ?>><i class="bi bi-plus-lg"></i><span>Keranjang</span></button><?php endif;?></div></div>
+                </article>
+            <?php endforeach; else: ?><div class="empty-products full-span"><i class="bi bi-search"></i><h3>Produk tidak ditemukan</h3><p>Coba kata kunci atau kategori yang berbeda.</p><a class="btn-primary-store" href="<?= legacy_base_url('produk'); ?>">Lihat semua produk</a></div><?php endif; ?>
+        </div>
+        <?= storefront_pagination($page, $totalPages, $pageQuery); ?>
+<?php };
+
+if ($ajax) {
+    ob_start();
+    $renderCatalog();
+    $section = ob_get_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'ok' => true,
+        'html' => $section,
+        'count' => (int) $totalProducts,
+        'from' => (int) $shownFrom,
+        'to' => (int) $shownTo,
+        'page' => (int) $page,
+        'pages' => (int) $totalPages,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 require __DIR__ . '/_header.php';
 ?>
 <main class="inner-page">
@@ -50,16 +86,7 @@ require __DIR__ . '/_header.php';
         </form>
     </section>
     <section class="store-container catalog-content">
-        <div class="catalog-result-head"><div><span class="eyebrow">HASIL KATALOG</span><h2><?= (int)$totalProducts; ?> Produk ditemukan</h2><?php if($totalProducts>0): ?><p class="catalog-range">Menampilkan <?= (int)$shownFrom; ?>–<?= (int)$shownTo; ?> dari <?= (int)$totalProducts; ?> produk • halaman <?= (int)$page; ?>/<?= (int)$totalPages; ?></p><?php endif; ?></div><span class="catalog-sync"><i class="bi bi-arrow-repeat"></i> Sinkron POS</span></div>
-        <div class="product-grid catalog-grid">
-            <?php if ($products): foreach ($products as $i => $product): $img = storefront_product_image($product); $fallbackImg = storefront_product_fallback($product); $stock = storefront_effective_stock($product); ?>
-                <article class="product-card">
-                    <div class="product-media"><button class="wish-btn <?= in_array((int)$product['id'], $wishlistIds, true) ? 'active' : ''; ?>" type="button" data-product-id="<?= (int)$product['id']; ?>"><i class="bi <?= in_array((int)$product['id'], $wishlistIds, true) ? 'bi-heart-fill' : 'bi-heart'; ?>"></i></button><a href="<?= e(storefront_product_url($product)); ?>"><img src="<?= e($img); ?>" data-fallback="<?= e($fallbackImg); ?>" onerror="this.onerror=null;this.src=this.dataset.fallback;" alt="<?= e($product['name']); ?>" loading="lazy"></a></div>
-                    <div class="product-info"><span class="product-category"><?= e($product['category_name'] ?: 'Produk'); ?></span><h3><a class="product-title-link" href="<?= e(storefront_product_url($product)); ?>"><?= e($product['name']); ?></a></h3><div class="rating"><i class="bi bi-star-fill"></i><span>Detail</span><small>Lihat produk</small></div><div class="product-bottom"><div><strong><?= rupiah($product['selling_price']); ?></strong><?php if((float)($product['original_selling_price']??0)>(float)$product['selling_price']):?><span class="flash-old-price"><?=rupiah($product['original_selling_price'])?></span><?php endif;?><span class="stock-badge <?= $stock <= 0 ? 'out' : ''; ?>"><?= $stock > 0 ? 'Stok ' . $stock : 'Habis'; ?></span></div><?php if((int)($product['variant_count']??0)>0):?><a class="add-cart-btn" href="<?=e(storefront_product_url($product))?>" title="Pilih varian"><i class="bi bi-sliders"></i><span>Pilih Varian</span></a><?php else:?><button class="add-cart-btn" type="button" data-product="<?= storefront_product_json($product); ?>" <?= $stock <= 0 ? 'disabled' : ''; ?>><i class="bi bi-plus-lg"></i><span>Keranjang</span></button><?php endif;?></div></div>
-                </article>
-            <?php endforeach; else: ?><div class="empty-products full-span"><i class="bi bi-search"></i><h3>Produk tidak ditemukan</h3><p>Coba kata kunci atau kategori yang berbeda.</p><a class="btn-primary-store" href="<?= legacy_base_url('produk'); ?>">Lihat semua produk</a></div><?php endif; ?>
-        </div>
-        <?= storefront_pagination($page, $totalPages, $pageQuery); ?>
+        <?php $renderCatalog(); ?>
     </section>
 </main>
 <?php require __DIR__ . '/_footer.php'; ?>

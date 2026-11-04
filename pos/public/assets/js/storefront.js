@@ -191,15 +191,62 @@
   window.addEventListener('load', () => setTimeout(() => qs('#storePageLoader')?.classList.add('hide'), 180));
   renderAll();
 
-  // Katalog: auto-apply filter (search debounce 300ms, select langsung submit).
+  // Katalog AJAX (v17.0.66): auto-apply tanpa reload — search debounce 300ms, select langsung, pagination click.
   const catalogForm = document.querySelector('.catalog-filter-form');
-  if (catalogForm) {
-    let delay = null;
-    const searchInput = catalogForm.querySelector('input[name="q"]');
-    if (searchInput) searchInput.addEventListener('input', () => {
-      clearTimeout(delay);
-      delay = setTimeout(() => catalogForm.submit(), 300);
+  const catalogArea = document.querySelector('.catalog-content');
+  if (catalogForm && catalogArea) {
+    let debounceTimer = null;
+    let inFlight = false;
+    const qInput = catalogForm.querySelector('input[name="q"]');
+    const base = catalogForm.getAttribute('action') || window.location.pathname;
+
+    function catalogParams(page) {
+      const p = new URLSearchParams(window.location.search);
+      const q = (qInput && qInput.value || '').trim();
+      const cat = catalogForm.querySelector('select[name="category"]').value || '';
+      const brand = catalogForm.querySelector('select[name="brand"]').value || '0';
+      const sort = catalogForm.querySelector('select[name="sort"]').value || 'name';
+      if (q) p.set('q', q); else p.delete('q');
+      if (cat) p.set('category', cat); else p.delete('category');
+      if (brand && brand !== '0') p.set('brand', brand); else p.delete('brand');
+      if (sort && sort !== 'name') p.set('sort', sort); else p.delete('sort');
+      if (page && page > 1) p.set('page', page); else p.delete('page');
+      return p;
+    }
+
+    function catalogLoad(page) {
+      if (inFlight) return;
+      const params = catalogParams(page || 1);
+      params.set('ajax', '1');
+      inFlight = true;
+      catalogArea.classList.add('catalog-loading');
+      fetch(base + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+        .then(data => {
+          if (!data || data.ok !== true) throw new Error('bad-response');
+          catalogArea.innerHTML = data.html;
+          window.history.replaceState({}, '', base + '?' + catalogParams(page || 1).toString());
+          bindCatalogNav();
+          const top = catalogArea.getBoundingClientRect().top + window.scrollY - 16;
+          window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+        })
+        .catch(() => { try { catalogForm.submit(); } catch (_) { window.location = base + '?' + catalogParams(page || 1).toString(); } })
+        .finally(() => { inFlight = false; catalogArea.classList.remove('catalog-loading'); });
+    }
+
+    function bindCatalogNav() {
+      catalogArea.querySelectorAll('.catalog-pagination a').forEach(a => a.addEventListener('click', ev => {
+        ev.preventDefault();
+        const u = new URL(a.getAttribute('href') || base, window.location.origin);
+        catalogLoad(parseInt(u.searchParams.get('page') || '1', 10) || 1);
+      }));
+    }
+
+    if (qInput) qInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => catalogLoad(1), 300);
     });
-    catalogForm.querySelectorAll('select').forEach(s => s.addEventListener('change', () => catalogForm.submit()));
+    catalogForm.querySelectorAll('select').forEach(s => s.addEventListener('change', () => catalogLoad(1)));
+    bindCatalogNav();
   }
 })();

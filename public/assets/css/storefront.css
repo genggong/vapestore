@@ -221,3 +221,5 @@
 .cancel-window-box button:hover{background:#be123c;color:#fff}
 .cancel-window-box.locked{border-color:rgba(107,114,128,.28);background:rgba(107,114,128,.06)}
 .cancel-window-box.locked small{color:#6b7280}
+
+.catalog-loading{opacity:.55;pointer-events:none;transition:opacity .2s ease}
