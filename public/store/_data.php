@@ -193,26 +193,6 @@ function storefront_categories(int $limit = 8): array
  * V17.0.26 — jumlah total produk pada katalog (untuk pagination).
  * Filter SAMA dengan storefront_products(); dipisah supaya COUNT(*) murah.
  */
-/**
- * V17.0.62 — search multi-token. "3ml 0.6" berarti nama/kode produk/desc jadi keluaran
- * hanya bila tiap kata cocok minimal di satu kolom (AND antar kata, OR antar kolom).
- * Mengembalikan expression SQL + mengisi $params. Kolom default beragam tapi ketiga
- * blok (list utama, fallback, total) memakai kolom yang sama.
- */
-function storefront_search_clause(string $search, array &$params, array $columns = []): string
-{
-    if ($search === '') return '';
-    if (!$columns) $columns = ['p.name', 'p.product_code', 'p.description', 'c.name'];
-    $terms = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY) ?: [$search];
-    $groups = [];
-    foreach ($terms as $t) {
-        $q = '%' . $t . '%';
-        $groups[] = '(' . implode(' OR ', array_map(static fn($c) => "$c LIKE ?", $columns)) . ')';
-        foreach ($columns as $_) $params[] = $q;
-    }
-    return '(' . implode(' AND ', $groups) . ')';
-}
-
 function storefront_products_total(array $options = []): int
 {
     $db = storefront_db();
@@ -239,7 +219,9 @@ function storefront_products_total(array $options = []): int
         }
     }
     if ($search !== '') {
-        $where[] = storefront_search_clause($search, $params);
+        $where[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
+        $q = '%' . $search . '%';
+        array_push($params, $q, $q, $q, $q);
     }
     if ($brand > 0) {
         if ($hasBrandColumn) {
@@ -375,7 +357,9 @@ function storefront_products(array $options = []): array
     }
 
     if ($search !== '') {
-        $where[] = storefront_search_clause($search, $params);
+        $where[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
+        $q = '%' . $search . '%';
+        array_push($params, $q, $q, $q, $q);
     }
 
     // Brand filtering supports both the legacy products.brand_id column and the
@@ -439,7 +423,9 @@ function storefront_products(array $options = []): array
                 }
             }
             if ($search !== '') {
-                $fallbackWhere[] = storefront_search_clause($search, $fallbackParams);
+                $fallbackWhere[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
+                $q = '%' . $search . '%';
+                array_push($fallbackParams, $q, $q, $q, $q);
             }
             if ($brand > 0) {
                 if ($hasBrandColumn) {

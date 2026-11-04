@@ -165,133 +165,6 @@ function storefront_categories(int $limit = 8): array
     }
 }
 
-/**
- * V17.0.62 — search multi-token. "3ml 0.6" berarti nama/kode produk/desc jadi keluaran
- * hanya bila tiap kata cocok minimal di satu kolom (AND antar kata, OR antar kolom).
- * Mengembalikan expression SQL + mengisi $params. Kolom default beragam tapi ketiga
- * blok (list utama, fallback, total) memakai kolom yang sama.
- */
-function storefront_search_clause(string $search, array &$params, array $columns = []): string
-{
-    if ($search === '') return '';
-    if (!$columns) $columns = ['p.name', 'p.product_code', 'p.description', 'c.name'];
-    $terms = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY) ?: [$search];
-    $groups = [];
-    foreach ($terms as $t) {
-        $q = '%' . $t . '%';
-        $groups[] = '(' . implode(' OR ', array_map(static fn($c) => "$c LIKE ?", $columns)) . ')';
-        foreach ($columns as $_) $params[] = $q;
-    }
-    return '(' . implode(' AND ', $groups) . ')';
-}
-
-function storefront_products_total(array $options = []): int
-{
-    $db = storefront_db();
-    if (!$db) return 0;
-
-    $category = trim((string) ($options['category'] ?? ''));
-    $search = trim((string) ($options['search'] ?? ''));
-    $brand = max(0, (int) ($options['brand'] ?? 0));
-    $hasBrandColumn = storefront_column_exists($db, 'products', 'brand_id');
-    $hasBrandTable = storefront_table_exists($db, 'marketplace_brands');
-    $hasProductMeta = marketplace_v15_product_meta_install($db);
-
-    $where = ['p.is_active = 1'];
-    $params = [];
-    $brandJoin = '';
-
-    if ($category !== '') {
-        if (ctype_digit($category)) {
-            $where[] = 'p.category_id = ?';
-            $params[] = (int) $category;
-        } else {
-            $where[] = 'c.slug = ?';
-            $params[] = $category;
-        }
-    }
-    if ($search !== '') {
-        $where[] = storefront_search_clause($search, $params);
-    }
-    if ($brand > 0) {
-        if ($hasBrandColumn) {
-            $where[] = 'p.brand_id = ?';
-            $params[] = $brand;
-        } elseif ($hasBrandTable && $hasProductMeta) {
-            $brandJoin = 'LEFT JOIN marketplace_product_meta pm ON pm.product_id = p.id';
-            $where[] = 'pm.brand_id = ?';
-            $params[] = $brand;
-        }
-    }
-
-    try {
-        $sql = "SELECT COUNT(*) FROM products p LEFT JOIN categories c ON c.id = p.category_id {$brandJoin} WHERE " . implode(' AND ', $where);
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        return (int) $stmt->fetchColumn();
-    } catch (Throwable $e) {
-        error_log('[storefront][count] ' . $e->getMessage());
-        return 0;
-    }
-}
-
-/**
- * V17.0.26 — HTML navigasi halaman (1, 2, 3, …) untuk katalog.
- * $query = filter aktif yang harus dipertahankan (q, category, brand, sort).
- */
-function storefront_pagination(int $page, int $pages, array $query = [], string $basePath = 'produk'): string
-{
-    if ($pages <= 1) return '';
-
-    $page = max(1, min($pages, $page));
-    $link = static function (int $p) use ($query, $basePath): string {
-        $qs = [];
-        foreach ($query as $k => $v) {
-            if ($v === null || $v === '' || $v === 0 || $v === '0') continue;
-            $qs[$k] = $v;
-        }
-        if ($p > 1) $qs['page'] = $p;
-        $url = legacy_base_url($basePath);
-        return $url . ($qs ? '?' . http_build_query($qs) : '');
-    };
-
-    $nums = [1];
-    for ($i = $page - 2; $i <= $page + 2; $i++) {
-        if ($i > 1 && $i < $pages) $nums[] = $i;
-    }
-    if ($pages > 1) $nums[] = $pages;
-    $nums = array_values(array_unique($nums));
-    sort($nums);
-
-    $html = '<nav class="catalog-pagination" aria-label="Navigasi halaman produk">';
-    if ($page > 1) {
-        $html .= '<a class="page-btn page-nav" href="' . e($link($page - 1)) . '" rel="prev" aria-label="Halaman sebelumnya"><i class="bi bi-chevron-left"></i><span>Sebelumnya</span></a>';
-    } else {
-        $html .= '<span class="page-btn page-nav disabled"><i class="bi bi-chevron-left"></i><span>Sebelumnya</span></span>';
-    }
-
-    $prev = 0;
-    foreach ($nums as $n) {
-        if ($prev > 0 && $n - $prev > 1) {
-            $html .= '<span class="page-dots" aria-hidden="true">…</span>';
-        }
-        if ($n === $page) {
-            $html .= '<span class="page-btn active" aria-current="page">' . $n . '</span>';
-        } else {
-            $html .= '<a class="page-btn" href="' . e($link($n)) . '" aria-label="Halaman ' . $n . '">' . $n . '</a>';
-        }
-        $prev = $n;
-    }
-
-    if ($page < $pages) {
-        $html .= '<a class="page-btn page-nav" href="' . e($link($page + 1)) . '" rel="next" aria-label="Halaman berikutnya"><span>Berikutnya</span><i class="bi bi-chevron-right"></i></a>';
-    } else {
-        $html .= '<span class="page-btn page-nav disabled"><span>Berikutnya</span><i class="bi bi-chevron-right"></i></span>';
-    }
-    $html .= '</nav>';
-    return $html;
-}
-
 function storefront_products(array $options = []): array
 {
     $db = storefront_db();
@@ -329,7 +202,9 @@ function storefront_products(array $options = []): array
     if (!isset($filterParams)) $filterParams = [];
 
     if ($search !== '') {
-        $where[] = storefront_search_clause($search, $filterParams);
+        $where[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
+        $q = '%' . $search . '%';
+        array_push($filterParams, $q, $q, $q, $q);
     }
 
     // Brand filtering supports both the legacy products.brand_id column and the
@@ -432,7 +307,9 @@ function storefront_products(array $options = []): array
                 }
             }
             if ($search !== '') {
-                $fallbackWhere[] = storefront_search_clause($search, $fallbackParams);
+                $fallbackWhere[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
+                $q = '%' . $search . '%';
+                array_push($fallbackParams, $q, $q, $q, $q);
             }
             if ($brand > 0) {
                 if ($hasBrandColumn) {
