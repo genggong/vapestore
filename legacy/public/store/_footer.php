@@ -78,6 +78,6 @@ $fabOptions = array_values(array_filter($fabOptions, fn($o) => $o['url'] !== '')
     <a class="<?= $activePage === 'tracking' ? 'active' : ''; ?>" href="<?= legacy_base_url('tracking'); ?>"><i class="bi bi-truck"></i><span>Tracking</span></a>
     <a class="<?= $activePage === 'account' ? 'active' : ''; ?>" href="<?= legacy_base_url(storefront_customer() ? 'akun' : 'masuk'); ?>"><i class="bi bi-person-fill"></i><span>Akun</span></a>
 </nav>
-<script src="<?= legacy_base_url('assets/js/storefront.js?v=17.0.1'); ?>" onload="window.VapekongHideStoreLoader&&window.VapekongHideStoreLoader()" onerror="window.VapekongHideStoreLoader&&window.VapekongHideStoreLoader()"></script>
+<script src="<?= legacy_base_url('assets/js/storefront.js?v=17.0.65'); ?>" onload="window.VapekongHideStoreLoader&&window.VapekongHideStoreLoader()" onerror="window.VapekongHideStoreLoader&&window.VapekongHideStoreLoader()"></script>
 </body>
 </html>
