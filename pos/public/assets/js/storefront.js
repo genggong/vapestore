@@ -190,4 +190,16 @@
   window.VapekongStoreCart = { getItems: () => cart.map(i => ({...i})), subtotal, money, add: (product, options={}) => addProduct(product, options), clear: () => { cart = []; saveCart(); } };
   window.addEventListener('load', () => setTimeout(() => qs('#storePageLoader')?.classList.add('hide'), 180));
   renderAll();
+
+  // Katalog: auto-apply filter (search debounce 300ms, select langsung submit).
+  const catalogForm = document.querySelector('.catalog-filter-form');
+  if (catalogForm) {
+    let delay = null;
+    const searchInput = catalogForm.querySelector('input[name="q"]');
+    if (searchInput) searchInput.addEventListener('input', () => {
+      clearTimeout(delay);
+      delay = setTimeout(() => catalogForm.submit(), 300);
+    });
+    catalogForm.querySelectorAll('select').forEach(s => s.addEventListener('change', () => catalogForm.submit()));
+  }
 })();

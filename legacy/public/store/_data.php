@@ -165,6 +165,26 @@ function storefront_categories(int $limit = 8): array
     }
 }
 
+/**
+ * V17.0.62 — search multi-token. "3ml 0.6" berarti nama/kode produk/desc jadi keluaran
+ * hanya bila tiap kata cocok minimal di satu kolom (AND antar kata, OR antar kolom).
+ * Mengembalikan expression SQL + mengisi $params. Kolom default beragam tapi ketiga
+ * blok (list utama, fallback, total) memakai kolom yang sama.
+ */
+function storefront_search_clause(string $search, array &$params, array $columns = []): string
+{
+    if ($search === '') return '';
+    if (!$columns) $columns = ['p.name', 'p.product_code', 'p.description', 'c.name'];
+    $terms = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY) ?: [$search];
+    $groups = [];
+    foreach ($terms as $t) {
+        $q = '%' . $t . '%';
+        $groups[] = '(' . implode(' OR ', array_map(static fn($c) => "$c LIKE ?", $columns)) . ')';
+        foreach ($columns as $_) $params[] = $q;
+    }
+    return '(' . implode(' AND ', $groups) . ')';
+}
+
 function storefront_products(array $options = []): array
 {
     $db = storefront_db();
@@ -202,9 +222,7 @@ function storefront_products(array $options = []): array
     if (!isset($filterParams)) $filterParams = [];
 
     if ($search !== '') {
-        $where[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
-        $q = '%' . $search . '%';
-        array_push($filterParams, $q, $q, $q, $q);
+        $where[] = storefront_search_clause($search, $filterParams);
     }
 
     // Brand filtering supports both the legacy products.brand_id column and the
@@ -307,9 +325,7 @@ function storefront_products(array $options = []): array
                 }
             }
             if ($search !== '') {
-                $fallbackWhere[] = '(p.name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ? OR c.name LIKE ?)';
-                $q = '%' . $search . '%';
-                array_push($fallbackParams, $q, $q, $q, $q);
+                $fallbackWhere[] = storefront_search_clause($search, $fallbackParams);
             }
             if ($brand > 0) {
                 if ($hasBrandColumn) {
