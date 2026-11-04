@@ -2083,7 +2083,8 @@ if (typeof window.Html5Qrcode === 'undefined') {
             renderMemberSearchResults(e.target.value);
         }
         if(e.target.matches('#posSearchTheme')){
-            applyPosSmartSearch(e.target.value);
+            clearTimeout(window.__posSearchDebounce);
+            window.__posSearchDebounce = setTimeout(function(){ applyPosSmartSearch(e.target.value); }, 300);
         }
         if(e.target.matches('[data-qty]')) setQty(e.target.dataset.qty, e.target.value);
         if(e.target.matches('#manualDiscountTheme,#paidTheme,#redeemPointsTheme')) updateTotals();
@@ -2112,6 +2113,9 @@ if (typeof window.Html5Qrcode === 'undefined') {
             const code = e.target.value.trim();
             if(code){
                 e.preventDefault();
+                // Flush hasil pencarian yg tertunda debounce agar akurat
+                clearTimeout(window.__posSearchDebounce);
+                applyPosSmartSearch(e.target.value);
                 // V17.0.42 — Enter pada hasil pencarian: kalau tinggal satu produk, langsung masuk keranjang.
                 const shown = visibleProductCards();
                 if (shown.length === 1) {
