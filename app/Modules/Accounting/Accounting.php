@@ -129,6 +129,7 @@ function accounting_payment_label(string $method): string
     $method = strtolower(trim($method));
     $labels = [
         'cash' => 'Tunai',
+        'cod' => 'Tunai',
         'tunai' => 'Tunai',
         'qris' => 'QRIS',
         'qris_pakasir' => 'QRIS Pakasir',

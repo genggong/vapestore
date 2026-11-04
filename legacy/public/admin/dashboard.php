@@ -80,6 +80,7 @@ function dashboard_daily_summary(PDO $db, int $branchId): array
                     WHEN status = 'success' AND payment_method = 'cash' THEN grand_total
                     WHEN status = 'success' AND payment_method = 'cash_debt'
                         THEN GREATEST(grand_total - COALESCE(debt_amount, 0), 0)
+                    WHEN status = 'success' AND payment_method = 'cod' THEN grand_total
                     ELSE 0
                 END), 0) AS cash_today,
                 COALESCE(SUM(CASE
