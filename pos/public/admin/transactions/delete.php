@@ -182,6 +182,30 @@ try {
             }
         }
 
+        // Kembalikan stok VARIAN: stock_movements tidak menyimpan variant_id, jadi baca
+        // transaction_items.variant_id. Restore varian (+qty) + restore parent (dari loop
+        // stock_movements) otomatis konsisten karena parent == SUM(stok varian).
+        if (trx_delete_table_exists($db, 'transaction_items')
+            && trx_delete_column_exists($db, 'transaction_items', 'variant_id')
+            && trx_delete_table_exists($db, 'marketplace_product_variant_stocks')
+            && $branchId > 0) {
+            $vstmt = $db->prepare("SELECT product_id, variant_id, qty FROM transaction_items WHERE transaction_id = ? AND variant_id IS NOT NULL AND variant_id > 0 AND qty > 0");
+            $vstmt->execute([$id]);
+            foreach ($vstmt->fetchAll() as $vit) {
+                $vpid = (int)$vit['product_id'];
+                $vid  = (int)$vit['variant_id'];
+                $vqty = max(0, (int)$vit['qty']);
+                if ($vid <= 0 || $vqty <= 0) continue;
+                $lockV = $db->prepare('SELECT stock FROM marketplace_product_variant_stocks WHERE variant_id = ? AND branch_id = ? FOR UPDATE');
+                $lockV->execute([$vid, $branchId]);
+                if ($lockV->fetchColumn() !== false) {
+                    $db->prepare('UPDATE marketplace_product_variant_stocks SET stock = stock + ?, updated_at = NOW() WHERE variant_id = ? AND branch_id = ?')->execute([$vqty, $vid, $branchId]);
+                } else {
+                    $db->prepare('INSERT INTO marketplace_product_variant_stocks (variant_id, branch_id, stock, minimum_stock, created_at) VALUES (?, ?, ?, 0, NOW())')->execute([$vid, $branchId, $vqty]);
+                }
+            }
+        }
+
         $stmt = $db->prepare("DELETE FROM stock_movements WHERE reference_type = 'transaction' AND reference_id = ?");
         $stmt->execute([$id]);
     }
