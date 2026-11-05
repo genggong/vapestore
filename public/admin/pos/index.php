@@ -1310,7 +1310,8 @@ a.pos-member-add-link {
                     <select name="payment_method" id="paymentMethodTheme" class="pos-select">
                         <option value="cash">Cash</option>
                         <option value="cash_debt">Cash + Piutang</option>
-                        <option value="qris_pakasir">QRIS Otomatis (Pakasir)</option>
+                        <?php /* Pakasir (QRIS otomatis) disembunyikan dari menu karena gateway tidak lagi beroperasi. Kode server & JS-nya dibiarkan utuh sebagai fallback. */ ?>
+                        <!-- <option value="qris_pakasir">QRIS Otomatis (Pakasir)</option> -->
                         <?php if ($manualQrisConfig['available']): ?>
                             <option value="qris_manual"><?= e($manualQrisConfig['label']); ?></option>
                         <?php endif; ?>
