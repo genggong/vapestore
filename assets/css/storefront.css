@@ -223,3 +223,18 @@
 .cancel-window-box.locked small{color:#6b7280}
 
 .catalog-loading{opacity:.55;pointer-events:none;transition:opacity .2s ease}
+
+/* ===== V17.0.75: autocomplete tunggal wilayah checkout ===== */
+.dst-autocomplete-label{position:relative;display:block;margin-top:2px}
+.dst-autocomplete-src{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important;pointer-events:none!important;clip:rect(0 0 0 0)!important}
+.dst-autocomplete-input{width:100%;min-height:46px;border:1.5px solid #e2e2e2;background:#fff;border-radius:12px;padding:0 14px;font-size:14px;font-weight:600;color:#111;outline:none;transition:border-color .15s,box-shadow .15s}
+.dst-autocomplete-input:focus{border-color:#7e22ce;box-shadow:0 0 0 4px rgba(168,85,247,.15)}
+.dst-autocomplete-input::placeholder{color:#9ca3af;font-weight:500}
+.dst-autocomplete-dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:80;background:#fff;border:1px solid #e2e2e2;border-radius:12px;box-shadow:0 20px 44px rgba(15,23,42,.16);max-height:280px;overflow:auto;padding:6px}
+.dst-autocomplete-dropdown[hidden]{display:none}
+.dst-option{display:block;width:100%;text-align:left;border:0;background:transparent;border-radius:9px;padding:10px 11px;cursor:pointer}
+.dst-option:hover,.dst-option:focus{background:#faf5ff;outline:none}
+.dst-option b{display:block;font-size:13.5px;font-weight:800;color:#111;line-height:1.25}
+.dst-option span{display:block;font-size:11.5px;color:#6b7280;margin-top:2px;line-height:1.3}
+.dst-empty{padding:12px 11px;color:#6b7280;font-size:12.5px;font-weight:600}
+@media (max-width:640px){.dst-autocomplete-input{min-height:48px;font-size:15px}}
