@@ -105,6 +105,15 @@
     // V17.0.76: lewatkan resolve-destination.php agar id cocok dgn DB kurir toko
     // (tanpa langkah ini opsi "Kurir Toko" tidak muncul).
     async function resolveChosenDestination(row) {
+      // Jika hasil pencarian belum lengkap sampai kelurahan (kota/kecamatan),
+      // jangan panggil resolve (endpoint menolak & memunculkan notif "Pilih wilayah
+      // sampai Kelurahan/Desa."); langsung pilih via data RajaOngkir yang ada.
+      if (!(row.subdistrict && row.district && row.city)) {
+        if (destInput) destInput.value = row.label || row.subdistrict || '';
+        setRegionStatus('Wilayah terpilih. Tarif pengiriman sedang dihitung.', 'success');
+        chooseDestination({ id: Number(row.id), label: row.label || row.subdistrict || '', province: row.province || '', city: row.city || '', district: row.district || '', subdistrict: row.subdistrict || '', zip_code: row.zip_code || '' });
+        return;
+      }
       setRegionBusy(true);
       setRegionStatus('Memvalidasi wilayah tujuan...', '');
       try {
