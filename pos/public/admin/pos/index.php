@@ -123,6 +123,19 @@ function pos_theme_membership_ensure(PDO $db): void
         INDEX idx_customer_points_transaction (transaction_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+    $db->exec("CREATE TABLE IF NOT EXISTS customer_referrals (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        referred_customer_id BIGINT NOT NULL,
+        referrer_customer_id BIGINT NOT NULL,
+        referral_phone VARCHAR(40) NOT NULL,
+        first_transaction_id BIGINT NULL,
+        referral_points INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY customer_referrals_referred_unique (referred_customer_id),
+        INDEX idx_customer_referrals_referrer (referrer_customer_id),
+        INDEX idx_customer_referrals_transaction (first_transaction_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
     if (pos_theme_table_exists($db, 'transactions') && !pos_theme_column_exists($db, 'transactions', 'customer_id')) {
         $db->exec("ALTER TABLE transactions ADD COLUMN customer_id BIGINT NULL AFTER cashier_id");
         $db->exec("ALTER TABLE transactions ADD INDEX idx_transactions_customer (customer_id)");
@@ -167,6 +180,35 @@ function pos_theme_add_customer_points(PDO $db, int $customerId, int $transactio
         $stmt = $db->prepare("UPDATE customers SET points = GREATEST(points - ?, 0), updated_at = NOW() WHERE id = ?");
         $stmt->execute([$points, $customerId]);
     }
+}
+
+function pos_theme_normalize_phone(string $phone): string
+{
+    $digits = preg_replace('/\\D+/', '', $phone) ?? '';
+    if ($digits === '') return '';
+    if (strpos($digits, '62') === 0) return $digits;
+    if ($digits[0] === '0') return '62' . substr($digits, 1);
+    return $digits;
+}
+
+function pos_theme_find_customer_by_phone(PDO $db, string $phone): ?array
+{
+    $needle = pos_theme_normalize_phone($phone);
+    if ($needle === '') return null;
+    $rows = $db->query("SELECT id, name, phone FROM customers WHERE status = 'active' AND phone IS NOT NULL AND phone <> ''")->fetchAll();
+    foreach ($rows as $row) {
+        if (pos_theme_normalize_phone((string) $row['phone']) === $needle) return $row;
+    }
+    return null;
+}
+
+function pos_theme_referral_points(PDO $db, int $customerId, int $transactionId, int $points, string $description): void
+{
+    if ($customerId <= 0 || $points <= 0) return;
+    $stmt = $db->prepare("SELECT COUNT(*) FROM customer_points WHERE customer_id = ? AND transaction_id = ? AND type = 'in' AND description LIKE 'Poin referral:%'");
+    $stmt->execute([$customerId, $transactionId]);
+    if ((int) $stmt->fetchColumn() > 0) return;
+    pos_theme_add_customer_points($db, $customerId, $transactionId, 'in', $points, $description);
 }
 
 
@@ -468,6 +510,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $paymentMethod = 'cash';
         }
         $customerId = (int) ($_POST['customer_id'] ?? 0);
+        $referrerPhone = trim((string) ($_POST['referrer_phone'] ?? ''));
         $redeemPoints = max(0, (int) ($_POST['redeem_points'] ?? 0));
         $note = trim($_POST['note'] ?? '');
         $debtDueDate = trim($_POST['debt_due_date'] ?? '');
@@ -588,6 +631,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $customer = null;
+        $referrer = null;
+        $referralPoints = 0;
         $pointDiscount = 0;
         $earnRate = pos_theme_point_earn_rate();
         $pointValue = pos_theme_point_value();
@@ -599,6 +644,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $customer = $stmt->fetch();
             if (!$customer) {
                 throw new Exception('Pelanggan/member tidak ditemukan atau nonaktif.');
+            }
+        }
+
+        if ($referrerPhone !== '') {
+            if (!$customer) {
+                throw new Exception('Pilih Customer Baru/member terlebih dahulu sebelum mengisi Nomor HP Pengajak.');
+            }
+            if (pos_theme_normalize_phone((string) ($customer['phone'] ?? '')) === pos_theme_normalize_phone($referrerPhone)) {
+                throw new Exception('Nomor HP Pengajak tidak boleh sama dengan nomor HP pelanggan baru.');
+            }
+            $referrer = pos_theme_find_customer_by_phone($db, $referrerPhone);
+            if (!$referrer) {
+                throw new Exception('Nomor HP Pengajak tidak ditemukan. Periksa nomor pelanggan lama.');
+            }
+            $existingReferral = $db->prepare("SELECT id FROM customer_referrals WHERE referred_customer_id = ? LIMIT 1");
+            $existingReferral->execute([(int) $customer['id']]);
+            if ($existingReferral->fetchColumn()) {
+                throw new Exception('Referral pelanggan ini sudah pernah dipakai. Referral hanya berlaku pada transaksi pertama.');
+            }
+            $priorTransactions = $db->prepare("SELECT COUNT(*) FROM transactions WHERE customer_id = ? AND status = 'success'");
+            $priorTransactions->execute([(int) $customer['id']]);
+            if ((int) $priorTransactions->fetchColumn() > 0) {
+                throw new Exception('Referral hanya dapat dipakai saat transaksi pertama Customer Baru.');
             }
         }
 
@@ -711,6 +779,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'earn_base' => (int) round($earnBase),
                 'earn_rate' => (int) round($earnRate),
                 'earn_points' => (int) $earnPoints,
+                'referrer_phone' => $referrerPhone,
+                'referrer_customer_id' => $referrer ? (int) $referrer['id'] : 0,
+                'referral_points' => $referrer ? (int) floor($earnPoints * 0.5) : 0,
             ]));
         }
 
@@ -767,6 +838,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($customer && $transactionStatus === 'success' && $earnPoints > 0) {
             pos_theme_add_customer_points($db, (int) $customer['id'], $transactionId, 'in', (int) $earnPoints, 'Poin belanja invoice ' . $invoice);
+        }
+
+        if ($referrer && $transactionStatus === 'success') {
+            $referralPoints = (int) floor($earnPoints * 0.5);
+            if ($referralPoints > 0) {
+                $stmt = $db->prepare("INSERT INTO customer_referrals (referred_customer_id, referrer_customer_id, referral_phone, first_transaction_id, referral_points, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                $stmt->execute([(int) $customer['id'], (int) $referrer['id'], $referrerPhone, $transactionId, $referralPoints]);
+                pos_theme_referral_points($db, (int) $referrer['id'], $transactionId, $referralPoints, 'Poin referral: ' . ($customer['name'] ?? 'pelanggan baru') . ' invoice ' . $invoice);
+            }
         }
 
         foreach ($items as $item) {
@@ -1203,6 +1283,11 @@ a.pos-member-add-link {
                             </option>
                         <?php endforeach; ?>
                     </select>
+                    <div class="member-referral-field-theme">
+                        <label class="mini-label" for="referrerPhoneTheme">Nomor HP Pengajak <span>(Pelanggan Lama / Referrer)</span></label>
+                        <input type="tel" name="referrer_phone" id="referrerPhoneTheme" inputmode="tel" autocomplete="off" placeholder="08xxxxxxxxxx">
+                        <small>Referral hanya berlaku pada transaksi pertama Customer Baru. Pengajak mendapat 50% dari poin reguler Customer Baru.</small>
+                    </div>
                     <?php if ($customerLoadError !== ''): ?>
                         <small class="member-empty-note pos-member-error"><i class="bi bi-exclamation-triangle-fill"></i> Gagal memuat daftar member: <?= e($customerLoadError); ?> — buka menu System Upgrade lalu muat ulang halaman ini.</small>
                     <?php elseif (!$customers): ?><small class="member-empty-note">Belum ada member aktif. Tambahkan member baru terlebih dahulu.</small><?php endif; ?>

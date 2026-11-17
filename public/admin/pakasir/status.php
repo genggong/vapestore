@@ -93,6 +93,44 @@ function pakasir_status_apply_member_points(PDO $db, array $trx, string $finalSt
     }
 }
 
+function pakasir_status_apply_referral(PDO $db, array $trx, string $finalStatus): void
+{
+    if ($finalStatus !== 'success') return;
+    $meta = pakasir_status_member_meta($trx);
+    $referredId = (int) ($meta['customer_id'] ?? $trx['customer_id'] ?? 0);
+    $referrerId = (int) ($meta['referrer_customer_id'] ?? 0);
+    $referralPoints = max(0, (int) ($meta['referral_points'] ?? 0));
+    $phone = trim((string) ($meta['referrer_phone'] ?? ''));
+    $transactionId = (int) ($trx['id'] ?? 0);
+    if ($referredId <= 0 || $referrerId <= 0 || $transactionId <= 0 || $phone === '') return;
+
+    $db->exec("CREATE TABLE IF NOT EXISTS customer_referrals (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        referred_customer_id BIGINT NOT NULL,
+        referrer_customer_id BIGINT NOT NULL,
+        referral_phone VARCHAR(40) NOT NULL,
+        first_transaction_id BIGINT NULL,
+        referral_points INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY customer_referrals_referred_unique (referred_customer_id),
+        INDEX idx_customer_referrals_referrer (referrer_customer_id),
+        INDEX idx_customer_referrals_transaction (first_transaction_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $check = $db->prepare("SELECT id FROM customer_referrals WHERE referred_customer_id = ? LIMIT 1");
+    $check->execute([$referredId]);
+    if ($check->fetchColumn()) return;
+    $stmt = $db->prepare("INSERT INTO customer_referrals (referred_customer_id, referrer_customer_id, referral_phone, first_transaction_id, referral_points, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+    $stmt->execute([$referredId, $referrerId, $phone, $transactionId, $referralPoints]);
+    if ($referralPoints <= 0) return;
+    $check = $db->prepare("SELECT COUNT(*) FROM customer_points WHERE customer_id = ? AND transaction_id = ? AND type = 'in' AND description LIKE 'Poin referral:%'");
+    $check->execute([$referrerId, $transactionId]);
+    if ((int) $check->fetchColumn() > 0) return;
+    $stmt = $db->prepare("INSERT INTO customer_points (customer_id, transaction_id, type, points, description, created_at) VALUES (?, ?, 'in', ?, ?, NOW())");
+    $stmt->execute([$referrerId, $transactionId, $referralPoints, 'Poin referral invoice ' . ($trx['invoice_number'] ?? '-')]);
+    $stmt = $db->prepare("UPDATE customers SET points = points + ?, updated_at = NOW() WHERE id = ?");
+    $stmt->execute([$referralPoints, $referrerId]);
+}
+
 
 function pakasir_http_get_json(string $url): array
 {
@@ -173,6 +211,7 @@ function pakasir_update_transaction(PDO $db, array $trx, array $meta, string $st
             $stmt->execute([$paidAmount, (int) $trx['id']]);
         }
         pakasir_status_apply_member_points($db, $trx, 'success');
+        pakasir_status_apply_referral($db, $trx, 'success');
         return;
     }
 
