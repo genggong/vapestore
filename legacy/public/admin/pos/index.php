@@ -944,13 +944,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,variant_id,product_name,variant_name,variant_sku,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,?,?,?,0,?,NOW())");
                     $stmt->execute([$transactionId,$product['id'],$variantId,$product['name'],$variantName,$variantSku,$item['qty'],$item['unit_price'],$item['price_level']??'retail',$item['purchase_price'],$item['subtotal']]);
                 }else{
-                    $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,product_name,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,?,0,?,NOW())");
+                    $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,product_name,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,0,?,NOW())");
                     $stmt->execute([$transactionId,$product['id'],$product['name'].' - '.$variantName,$item['qty'],$item['unit_price'],$item['price_level']??'retail',$item['purchase_price'],$item['subtotal']]);
                 }
                 marketplace_v16_set_variant_stock($db,$variantId,$currentBranchId,$stockAfter,(int)($variant['minimum_stock']??0));marketplace_v16_sync_parent_stock($db,(int)$product['id'],$currentBranchId);
                 $moveNote='Penjualan varian '.$variantName.' - '.$invoice;
             }else{
-                $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,product_name,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,?,0,?,NOW())");
+                $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,product_name,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,0,?,NOW())");
                 $stmt->execute([$transactionId,$product['id'],$product['name'],$item['qty'],$item['unit_price'],$item['price_level']??'retail',$item['purchase_price'],$item['subtotal']]);
                 branch_sync_product($db,(int)$product['id']);$db->prepare('UPDATE product_branch_stocks SET stock=?,updated_at=NOW() WHERE branch_id=? AND product_id=?')->execute([$stockAfter,$currentBranchId,$product['id']]);$m=$db->prepare('SELECT is_main FROM branches WHERE id=? LIMIT 1');$m->execute([$currentBranchId]);if((int)$m->fetchColumn()===1)$db->prepare('UPDATE products SET stock=?,updated_at=NOW() WHERE id=?')->execute([$stockAfter,$product['id']]);$moveNote='Penjualan '.$invoice;
             }
