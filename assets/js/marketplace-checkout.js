@@ -105,15 +105,9 @@
     // V17.0.76: lewatkan resolve-destination.php agar id cocok dgn DB kurir toko
     // (tanpa langkah ini opsi "Kurir Toko" tidak muncul).
     async function resolveChosenDestination(row) {
-      // Jika hasil pencarian belum lengkap sampai kelurahan (kota/kecamatan),
-      // jangan panggil resolve (endpoint menolak & memunculkan notif "Pilih wilayah
-      // sampai Kelurahan/Desa."); langsung pilih via data RajaOngkir yang ada.
-      if (!(row.subdistrict && row.district && row.city)) {
-        if (destInput) destInput.value = row.label || row.subdistrict || '';
-        setRegionStatus('Wilayah terpilih. Tarif pengiriman sedang dihitung.', 'success');
-        chooseDestination({ id: Number(row.id), label: row.label || row.subdistrict || '', province: row.province || '', city: row.city || '', district: row.district || '', subdistrict: row.subdistrict || '', zip_code: row.zip_code || '' });
-        return;
-      }
+      // Selalu melewati resolve-destination.php (seperti dropdown lama) agar
+      // destination_id cocok dgn tarif Kurir Toko. endpoint kini menerima kelurahan
+      // saja (district/city boleh kosong) sehingga tidak ada notif "Pilih wilayah...".
       setRegionBusy(true);
       setRegionStatus('Memvalidasi wilayah tujuan...', '');
       try {
@@ -135,8 +129,10 @@
         setRegionStatus('Wilayah terpilih. Tarif pengiriman sedang dihitung.', 'success');
         chooseDestination(item);
       } catch (err) {
-        clearDestinationState('Pilih wilayah yang valid untuk melihat ongkir.');
-        setRegionStatus(err.message || 'Wilayah belum dapat dipetakan.', 'error');
+        // Fallback aman: tetap pilih via data RajaOngkir agar checkout tidak terblok,
+        // walau Kurir Toko mungkin tidak tersedia untuk data tanpa resolve.
+        clearDestinationState(err.message || 'Wilayah belum dapat dipetakan.');
+        setRegionStatus('Wilayah belum dapat dipetakan ke tarif. Pilih kelurahan yang lebih spesifik.', 'error');
       } finally {
         setRegionBusy(false);
       }

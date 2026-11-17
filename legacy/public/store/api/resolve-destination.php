@@ -8,8 +8,8 @@ try {
     $city = trim((string)($_GET['city'] ?? ''));
     $province = trim((string)($_GET['province'] ?? ''));
     $zip = trim((string)($_GET['zip_code'] ?? ''));
-    if ($subdistrict === '' || $district === '' || $city === '') {
-        throw new InvalidArgumentException('Pilih wilayah sampai Kelurahan/Desa.');
+    if ($subdistrict === '') {
+        throw new InvalidArgumentException('Pilih kelurahan/desa terlebih dahulu.');
     }
     $row = marketplace_rajaongkir_resolve_direct_destination($subdistrict, $district, $city, $zip);
     if (!empty($province) && empty($row['province'])) $row['province'] = $province;
