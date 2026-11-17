@@ -84,7 +84,7 @@ function dashboard_daily_summary(PDO $db, int $branchId): array
                     ELSE 0
                 END), 0) AS cash_today,
                 COALESCE(SUM(CASE
-                    WHEN status = 'success' AND payment_method IN ('qris', 'qris_pakasir', 'qris_manual') THEN grand_total
+                    WHEN status = 'success' AND payment_method IN ('qris', 'qris_pakasir', 'qris_manual', 'qris_casaku') THEN grand_total
                     ELSE 0
                 END), 0) AS qris_today,
                 COUNT(*) AS invoice_today
@@ -241,10 +241,10 @@ require_once __DIR__ . '/../layouts/admin-sidebar.php';
             </div>
 
             <div class="shortcut-grid">
-                <a class="shortcut-btn" href="<?= legacy_base_url('admin/pos/index.php'); ?>"><i class="bi bi-cart-check"></i><span>POS Kasir</span></a>
-                <a class="shortcut-btn" href="<?= legacy_base_url('admin/products/index.php'); ?>"><i class="bi bi-box-seam"></i><span>Produk</span></a>
-                <a class="shortcut-btn" href="<?= legacy_base_url('admin/stock/index.php'); ?>"><i class="bi bi-inboxes"></i><span>Stok</span></a>
-                <a class="shortcut-btn" href="<?= legacy_base_url('admin/transactions/index.php'); ?>"><i class="bi bi-receipt"></i><span>Transaksi</span></a>
+                <a class="shortcut-btn" href="<?= base_url('admin/pos/index.php'); ?>"><i class="bi bi-cart-check"></i><span>POS Kasir</span></a>
+                <a class="shortcut-btn" href="<?= base_url('admin/products/index.php'); ?>"><i class="bi bi-box-seam"></i><span>Produk</span></a>
+                <a class="shortcut-btn" href="<?= base_url('admin/stock/index.php'); ?>"><i class="bi bi-inboxes"></i><span>Stok</span></a>
+                <a class="shortcut-btn" href="<?= base_url('admin/transactions/index.php'); ?>"><i class="bi bi-receipt"></i><span>Transaksi</span></a>
             </div>
         </div>
     </section>

@@ -92,6 +92,7 @@ require __DIR__ . '/_header.php';
                     <label>Nama Penerima<input type="text" name="recipient_name" required minlength="2" maxlength="160" placeholder="Nama lengkap" value="<?= e($customer['name'] ?? ''); ?>"></label>
                     <label>Nomor WhatsApp<input type="tel" name="recipient_phone" required inputmode="tel" maxlength="30" placeholder="08xxxxxxxxxx" value="<?= e($customer['phone'] ?? ''); ?>"></label>
                     <label>Email <small>(opsional)</small><input type="email" name="recipient_email" maxlength="190" placeholder="nama@email.com" value="<?= e($customer['email'] ?? ''); ?>"></label>
+                    <label>Nomor HP Pengajak <small>(opsional, hanya Customer Baru)</small><input type="tel" name="referrer_phone" inputmode="tel" maxlength="30" placeholder="08xxxxxxxxxx"></label>
                     <label class="delivery-only">Kode Pos<input type="text" name="postal_code" id="postalCode" inputmode="numeric" maxlength="10" placeholder="Otomatis / isi manual"></label>
                     <label class="span-2 delivery-only">Alamat Lengkap<textarea name="address" required minlength="8" rows="3" placeholder="Nama jalan, nomor rumah, RT/RW, patokan..."></textarea></label>
                     <div class="span-2 checkout-region-block delivery-only">

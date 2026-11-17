@@ -1639,6 +1639,16 @@ function marketplace_create_order(PDO $db, array $payload): array
             $customerId = (int) $db->lastInsertId();
         }
     }
+    $referrerPhone = marketplace_order_referral_phone((string)($payload['referrer_phone'] ?? ''));
+    if ($referrerPhone !== '') {
+        if ($customerId <= 0) throw new InvalidArgumentException('Customer baru tidak dapat dibuat.');
+        $refCheck = $db->prepare("SELECT id FROM customers WHERE status='active' AND REPLACE(REPLACE(REPLACE(phone,'+',''),' ',''),'-','') IN (?,?) AND id<>? LIMIT 1");
+        $refCheck->execute([$referrerPhone, '0' . substr($referrerPhone, 2), $customerId]);
+        if (!(int)$refCheck->fetchColumn()) throw new InvalidArgumentException('Nomor HP Pengajak tidak ditemukan sebagai member aktif.');
+        $priorRef = $db->prepare("SELECT id FROM customer_referrals WHERE referred_customer_id=? LIMIT 1");
+        try { $priorRef->execute([$customerId]); if ($priorRef->fetchColumn()) throw new InvalidArgumentException('Customer ini sudah pernah memakai referral.'); } catch (PDOException $e) {}
+        $customerNote = trim($customerNote . "\n[REFERRAL_PHONE]" . $referrerPhone . "[/REFERRAL_PHONE]");
+    }
     $pointsRequested = max(0, (int)($payload['points_to_use'] ?? 0));
     $pointsPreview = marketplace_v15_points_preview($db, $customerId, $pointsRequested, max(0,$subtotal-$discount), false);
     $pointsDiscount = (float)$pointsPreview['discount'];
@@ -1777,6 +1787,7 @@ function marketplace_create_order(PDO $db, array $payload): array
             $db->prepare("UPDATE online_orders SET order_status='paid',fulfillment_status='waiting_pick',paid_at=NOW(),updated_at=NOW() WHERE id=?")->execute([$orderId]);
             marketplace_add_event($db, $orderId, 'paid', 'Pembayaran berhasil', 'Pembayaran terkonfirmasi otomatis.');
             marketplace_award_customer_points($db, $orderId);
+            marketplace_apply_order_referral($db, $orderId);
         }
         }
     } catch (Throwable $e) {
@@ -1821,8 +1832,47 @@ function marketplace_retry_payment(PDO $db, array $order): array
         $db->prepare("UPDATE online_orders SET order_status='paid',fulfillment_status='waiting_pick',paid_at=COALESCE(paid_at,NOW()),updated_at=NOW() WHERE id=?")->execute([(int)$order['id']]);
         marketplace_add_event($db,(int)$order['id'],'paid','Pembayaran berhasil','Pembayaran terkonfirmasi saat membuat ulang instruksi pembayaran.');
         marketplace_award_customer_points($db,(int)$order['id']);
+        marketplace_apply_order_referral($db,(int)$order['id']);
     }
     return marketplace_get_order($db, (string) $order['order_number']) ?: $order;
+}
+
+function marketplace_order_referral_phone(string $phone): string
+{
+    $digits = preg_replace('/\D+/', '', trim($phone));
+    if ($digits === '') return '';
+    if (str_starts_with($digits, '0')) $digits = '62' . substr($digits, 1);
+    elseif (!str_starts_with($digits, '62')) $digits = '62' . $digits;
+    return $digits;
+}
+
+function marketplace_apply_order_referral(PDO $db, int $orderId): int
+{
+    $st = $db->prepare("SELECT * FROM online_orders WHERE id=? LIMIT 1 FOR UPDATE");
+    $st->execute([$orderId]);
+    $order = $st->fetch();
+    if (!$order || (int)$order['customer_id'] <= 0 || (string)$order['payment_status'] !== 'paid') return 0;
+    if (!preg_match('/\[REFERRAL_PHONE\](.*?)\[\/REFERRAL_PHONE\]/s', (string)$order['customer_note'], $m)) return 0;
+    $phone = marketplace_order_referral_phone($m[1]);
+    if ($phone === '') return 0;
+    $st = $db->prepare("SELECT id FROM customers WHERE status='active' AND REPLACE(REPLACE(REPLACE(phone,'+',''),' ',''),'-','') IN (?,?) AND id<>? LIMIT 1");
+    $st->execute([$phone, '0' . substr($phone, 2), (int)$order['customer_id']]);
+    $referrerId = (int)$st->fetchColumn();
+    if ($referrerId <= 0) return 0;
+    $db->exec("CREATE TABLE IF NOT EXISTS customer_referrals (id BIGINT AUTO_INCREMENT PRIMARY KEY,referred_customer_id BIGINT NOT NULL,referrer_customer_id BIGINT NOT NULL,referral_phone VARCHAR(40) NOT NULL,first_transaction_id BIGINT NULL,referral_points INT NOT NULL DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY customer_referrals_referred_unique(referred_customer_id),INDEX idx_customer_referrals_referrer(referrer_customer_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $st = $db->prepare("SELECT id FROM customer_referrals WHERE referred_customer_id=? LIMIT 1"); $st->execute([(int)$order['customer_id']]);
+    if ($st->fetchColumn()) return 0;
+    $points = (int)($order['points_earned'] ?? 0);
+    $refPoints = (int)floor($points * 0.5);
+    $db->prepare("INSERT INTO customer_referrals(referred_customer_id,referrer_customer_id,referral_phone,first_transaction_id,referral_points) VALUES(?,?,?,?,?)")
+        ->execute([(int)$order['customer_id'],$referrerId,$phone,(int)$order['id'],$refPoints]);
+    if ($refPoints > 0) {
+        if (!function_exists('marketplace_v15_points_ensure')) marketplace_v15_points_ensure($db);
+        $db->prepare("INSERT INTO customer_points(customer_id,transaction_id,type,points,description) VALUES(?,NULL,'in',?,?)")
+            ->execute([$referrerId,$refPoints,'Poin referral marketplace '.$order['order_number']]);
+        $db->prepare("UPDATE customers SET points=points+?,updated_at=NOW() WHERE id=?")->execute([$refPoints,$referrerId]);
+    }
+    return $refPoints;
 }
 
 function marketplace_award_customer_points(PDO $db, int $orderId): int
@@ -2021,6 +2071,7 @@ function marketplace_apply_payment_webhook(PDO $db, array $payload): ?array
         if (!$wasPaid) {
             marketplace_add_event($db, (int) $order['id'], 'paid', 'Pembayaran berhasil', 'Pembayaran terkonfirmasi melalui webhook.');
             marketplace_award_customer_points($db, (int) $order['id']);
+            marketplace_apply_order_referral($db, (int) $order['id']);
         }
     } elseif (in_array($status, ['expired','failed'], true) && ($order['payment_status'] ?? '') !== 'paid') {
         $orderStatus = $status === 'expired' ? 'expired' : 'cancelled';

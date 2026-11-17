@@ -458,6 +458,15 @@ function pos_theme_pack_pakasir_note(array $payment): string
 }
 
 
+function pos_theme_manual_qris_image_url(string $image): string
+{
+    $image = trim($image);
+    if ($image === '') return '';
+    if (preg_match('#^https?://#i', $image)) return $image;
+    $image = preg_replace('#^/?(?:public/)?#', '', $image);
+    return base_url($image);
+}
+
 function pos_theme_manual_qris_config(): array
 {
     $image = trim((string)setting('qris_manual_image', ''));
@@ -466,12 +475,14 @@ function pos_theme_manual_qris_config(): array
     $publicRoot = realpath(__DIR__ . '/../../');
     $fullPath = $publicRoot && $image !== '' ? $publicRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, ltrim($image, '/')) : '';
     $available = $enabled && $image !== '' && $fullPath !== '' && is_file($fullPath);
+    $imageUrl = pos_theme_manual_qris_image_url($image);
 
     return [
         'enabled' => $enabled,
         'available' => $available,
         'label' => $label,
         'image' => $image,
+        'image_url' => $imageUrl,
     ];
 }
 
@@ -722,7 +733,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $earnBase = $grandTotal;
         $earnPoints = ($customer && $earnRate > 0) ? (int) floor($earnBase / $earnRate) : 0;
 
-        if (!in_array($paymentMethod, ['cash', 'qris_pakasir', 'qris_manual'], true)) {
+        if (!in_array($paymentMethod, ['cash', 'qris_pakasir', 'qris_manual', 'qris_casaku'], true)) {
             throw new Exception('Metode pembayaran tidak valid. Pilih Cash atau QRIS.');
         }
         $manualQrisConfig = pos_theme_manual_qris_config();
@@ -780,11 +791,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pakasirPayment['original_amount'] = (int) round($baseGrandTotal);
             $pakasirPayment['unique_code'] = (int) $uniqueCode;
             $pakasirPayment['amount'] = (int) round($grandTotal);
-        } else {
+        } elseif ($paymentMethod === 'qris_manual') {
             // QRIS Manual dianggap sukses setelah kasir mencentang konfirmasi pembayaran diterima.
             $paidAmount = $grandTotal;
             $changeAmount = 0;
             $transactionStatus = 'success';
+        } elseif ($paymentMethod === 'qris_casaku') {
+            $paidAmount = $grandTotal;
+            $changeAmount = 0;
+            $transactionStatus = 'pending';
+            $casakuPayment = marketplace_casaku_create($db, $invoice, (int) round($grandTotal), 'qris');
+            $note = trim($note . "\nPembayaran QRIS CasaKu dibuat. Order ID: " . $invoice . "\n[CASAKU_PAYMENT]" . json_encode($casakuPayment, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "[/CASAKU_PAYMENT]");
         }
 
         if ($promo) {
@@ -1079,7 +1096,7 @@ $manualQrisConfig = pos_theme_manual_qris_config();
 
 $paymentMethods = [
     ['code' => 'cash', 'name' => 'Cash'],
-    ['code' => 'qris_pakasir', 'name' => 'QRIS Otomatis (Pakasir)'],
+    ['code' => 'qris_casaku', 'name' => 'QRIS CasaKu'],
 ];
 if ($manualQrisConfig['available']) {
     $paymentMethods[] = ['code' => 'qris_manual', 'name' => $manualQrisConfig['label']];
@@ -1449,7 +1466,8 @@ a.pos-member-add-link {
                         <option value="cash">Cash</option>
                         <option value="cash_debt">Cash + Piutang</option>
                         <?php /* Pakasir (QRIS otomatis) disembunyikan dari menu karena gateway tidak lagi beroperasi. Kode server & JS-nya dibiarkan utuh sebagai fallback. */ ?>
-                        <!-- <option value="qris_pakasir">QRIS Otomatis (Pakasir)</option> -->
+                        <?php /* Pakasir disembunyikan; CasaKu menjadi QRIS aktif di POS. */ ?>
+                        <option value="qris_casaku">QRIS CasaKu</option>
                         <?php if ($manualQrisConfig['available']): ?>
                             <option value="qris_manual"><?= e($manualQrisConfig['label']); ?></option>
                         <?php endif; ?>
@@ -1487,7 +1505,7 @@ a.pos-member-add-link {
                     <?php if ($manualQrisConfig['available']): ?>
                     <div id="manualQrisBlockTheme" class="manual-qris-box" style="display:none;">
                         <div class="manual-qris-head"><i class="bi bi-qr-code-scan"></i><div><b><?= e($manualQrisConfig['label']); ?></b><span>Scan QRIS toko, lalu konfirmasi setelah pembayaran benar-benar diterima.</span></div></div>
-                        <img src="<?= base_url($manualQrisConfig['image']); ?>" alt="<?= e($manualQrisConfig['label']); ?>">
+                        <img src="<?= e($manualQrisConfig['image_url']); ?>" alt="<?= e($manualQrisConfig['label']); ?>">
                         <label class="manual-qris-confirm"><input type="checkbox" name="manual_qris_confirm" id="manualQrisConfirmTheme" value="1"> <span>Saya sudah menerima pembayaran QRIS ini</span></label>
                     </div>
                     <?php endif; ?>

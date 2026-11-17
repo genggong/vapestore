@@ -619,6 +619,8 @@
 
       const formData = new FormData(form);
       const payload = Object.fromEntries(formData.entries());
+      const referral = form.querySelector('[name="referrer_phone"]');
+      if (referral && referral.value.trim()) payload.referrer_phone = referral.value.trim();
       payload.items = items;
       payload.destination_id = Number(payload.destination_id || 0);
       payload.shipping_cost = Number(payload.shipping_cost || 0);

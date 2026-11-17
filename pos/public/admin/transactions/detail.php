@@ -36,6 +36,12 @@ if (!empty($trx['note']) && preg_match('/\[PAKASIR_PAYMENT\](.*?)\[\/PAKASIR_PAY
     }
 }
 
+$casakuPayment = null;
+if (!empty($trx['note']) && preg_match('/\[CASAKU_PAYMENT\](.*?)\[\/CASAKU_PAYMENT\]/s', (string) $trx['note'], $m)) {
+    $decoded = json_decode($m[1], true);
+    if (is_array($decoded)) $casakuPayment = $decoded;
+}
+
 $memberPayment = null;
 if (!empty($trx['note']) && preg_match('/\[MEMBER_POINTS\](.*?)\[\/MEMBER_POINTS\]/s', (string) $trx['note'], $m)) {
     $decoded = json_decode($m[1], true);
@@ -199,6 +205,10 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
     </section>
     <?php endif; ?>
 
+    <?php if ($casakuPayment && ($trx['payment_method'] ?? '') === 'qris_casaku'): ?>
+    <section class="pakasir-card"><div class="pakasir-card-head"><i class="bi bi-qr-code-scan"></i><div><h3>Pembayaran QRIS CasaKu</h3><p>Scan QR berikut untuk menyelesaikan pembayaran.</p></div></div><div class="pakasir-live-status" id="casakuLiveStatus" data-transaction-id="<?= e($trx['id']); ?>"><span class="pakasir-live-dot"></span><span id="casakuLiveText">Menunggu pembayaran QRIS CasaKu.</span><button type="button" class="pakasir-check-btn" id="casakuManualCheck">Cek Status</button></div><div class="pakasir-qr-wrap"><div class="pakasir-qr-box"><div id="casakuQr" data-qr="<?= e($casakuPayment['qr_string'] ?? ''); ?>"></div></div><div class="pakasir-pay-lines"><div class="pakasir-pay-line"><span>Order ID</span><b><?= e($casakuPayment['order_id'] ?? $trx['invoice_number']); ?></b></div><div class="pakasir-pay-line total-qris"><span>Total Bayar</span><b><?= rupiah($casakuPayment['total_payment'] ?? $casakuPayment['amount'] ?? $trx['grand_total']); ?></b></div><div class="pakasir-qr-fallback"><?= e($casakuPayment['qr_string'] ?? 'QR string tidak tersedia'); ?></div></div></div></section>
+    <?php endif; ?>
+
     <?php if ($manualQrisPayment && ($trx['payment_method'] ?? '') === 'qris_manual'): ?>
     <section class="manual-qris-detail">
         <div class="manual-qris-detail-head">
@@ -334,6 +344,20 @@ document.addEventListener('DOMContentLoaded', function () {
 <?php endif; ?>
 
 
+<?php if ($casakuPayment): ?>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+ const qr=document.getElementById('casakuQr'), value=qr&&qr.dataset.qr;
+ if(qr&&value&&window.QRCode)new QRCode(qr,{text:value,width:180,height:180,correctLevel:QRCode.CorrectLevel.M});
+ const box=document.getElementById('casakuLiveStatus'), text=document.getElementById('casakuLiveText'), btn=document.getElementById('casakuManualCheck');
+ if(!box||!text)return; let busy=false;
+ const check=()=>{if(busy)return;busy=true;if(btn)btn.disabled=true;fetch('<?= base_url('admin/casaku/status.php'); ?>?id='+encodeURIComponent(box.dataset.transactionId),{credentials:'same-origin'}).then(r=>r.json()).then(j=>{if(j.success){text.textContent=j.message;if(j.status==='success'){box.classList.add('success');location.reload();}else if(j.status==='failed'){box.classList.add('failed');}}}).finally(()=>{busy=false;if(btn)btn.disabled=false;});};
+ if(btn)btn.addEventListener('click',check); check(); setInterval(check,5000);
+});
+</script>
+<?php endif; ?>
+
 <?php if ($pakasirPayment): ?>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
@@ -348,6 +372,11 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 <?php endif; ?>
 
+
+<?php if ($casakuPayment): ?>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>document.addEventListener('DOMContentLoaded',function(){const e=document.getElementById('casakuQr'),v=e&&e.dataset.qr;if(e&&v&&window.QRCode)new QRCode(e,{text:v,width:180,height:180,correctLevel:QRCode.CorrectLevel.M});});</script>
+<?php endif; ?>
 
 <?php if ($pakasirPayment): ?>
 <script>

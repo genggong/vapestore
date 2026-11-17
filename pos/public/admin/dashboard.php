@@ -84,7 +84,7 @@ function dashboard_daily_summary(PDO $db, int $branchId): array
                     ELSE 0
                 END), 0) AS cash_today,
                 COALESCE(SUM(CASE
-                    WHEN status = 'success' AND payment_method IN ('qris', 'qris_pakasir', 'qris_manual') THEN grand_total
+                    WHEN status = 'success' AND payment_method IN ('qris', 'qris_pakasir', 'qris_manual', 'qris_casaku') THEN grand_total
                     ELSE 0
                 END), 0) AS qris_today,
                 COUNT(*) AS invoice_today
