@@ -510,6 +510,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $paymentMethod = 'cash';
         }
         $customerId = (int) ($_POST['customer_id'] ?? 0);
+        $referrerCustomerId = (int) ($_POST['referrer_customer_id'] ?? 0);
         $referrerPhone = trim((string) ($_POST['referrer_phone'] ?? ''));
         $redeemPoints = max(0, (int) ($_POST['redeem_points'] ?? 0));
         $note = trim($_POST['note'] ?? '');
@@ -654,7 +655,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (pos_theme_normalize_phone((string) ($customer['phone'] ?? '')) === pos_theme_normalize_phone($referrerPhone)) {
                 throw new Exception('Nomor HP Pengajak tidak boleh sama dengan nomor HP pelanggan baru.');
             }
-            $referrer = pos_theme_find_customer_by_phone($db, $referrerPhone);
+            $referrer = $referrerCustomerId > 0
+                ? $db->prepare("SELECT id, name, phone FROM customers WHERE id = ? AND status = 'active' LIMIT 1")
+                : null;
+            if ($referrer) {
+                $referrer->execute([$referrerCustomerId]);
+                $referrer = $referrer->fetch() ?: null;
+                if ($referrer && pos_theme_normalize_phone((string) $referrer['phone']) !== pos_theme_normalize_phone($referrerPhone)) $referrer = null;
+            }
+            if (!$referrer) $referrer = pos_theme_find_customer_by_phone($db, $referrerPhone);
             if (!$referrer) {
                 throw new Exception('Nomor HP Pengajak tidak ditemukan. Periksa nomor pelanggan lama.');
             }
@@ -842,9 +851,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($referrer && $transactionStatus === 'success') {
             $referralPoints = (int) floor($earnPoints * 0.5);
+            $stmt = $db->prepare("INSERT INTO customer_referrals (referred_customer_id, referrer_customer_id, referral_phone, first_transaction_id, referral_points, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            $stmt->execute([(int) $customer['id'], (int) $referrer['id'], $referrerPhone, $transactionId, $referralPoints]);
             if ($referralPoints > 0) {
-                $stmt = $db->prepare("INSERT INTO customer_referrals (referred_customer_id, referrer_customer_id, referral_phone, first_transaction_id, referral_points, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                $stmt->execute([(int) $customer['id'], (int) $referrer['id'], $referrerPhone, $transactionId, $referralPoints]);
                 pos_theme_referral_points($db, (int) $referrer['id'], $transactionId, $referralPoints, 'Poin referral: ' . ($customer['name'] ?? 'pelanggan baru') . ' invoice ' . $invoice);
             }
         }
@@ -1284,9 +1293,17 @@ a.pos-member-add-link {
                         <?php endforeach; ?>
                     </select>
                     <div class="member-referral-field-theme">
-                        <label class="mini-label" for="referrerPhoneTheme">Nomor HP Pengajak <span>(Pelanggan Lama / Referrer)</span></label>
-                        <input type="tel" name="referrer_phone" id="referrerPhoneTheme" inputmode="tel" autocomplete="off" placeholder="08xxxxxxxxxx">
-                        <small>Referral hanya berlaku pada transaksi pertama Customer Baru. Pengajak mendapat 50% dari poin reguler Customer Baru.</small>
+                        <label class="mini-label" for="referrerMemberTheme">Pengajak <span>(Pelanggan Lama / Referrer)</span></label>
+                        <select name="referrer_customer_id" id="referrerMemberTheme">
+                            <option value="" data-referrer-phone="">Pilih member pengajak...</option>
+                            <?php foreach ($customers as $referrerOption): ?>
+                                <option value="<?= e($referrerOption['id']); ?>" data-referrer-phone="<?= e($referrerOption['phone'] ?? ''); ?>" data-referrer-name="<?= e($referrerOption['name']); ?>">
+                                    <?= e($referrerOption['name']); ?><?= !empty($referrerOption['phone']) ? ' — ' . e($referrerOption['phone']) : ''; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <input type="hidden" name="referrer_phone" id="referrerPhoneTheme" value="">
+                        <small id="referrerInfoTheme">Pilih nama member lama yang mengajak Customer Baru. Referral hanya berlaku pada transaksi pertama dan pengajak mendapat 50% poin reguler.</small>
                     </div>
                     <?php if ($customerLoadError !== ''): ?>
                         <small class="member-empty-note pos-member-error"><i class="bi bi-exclamation-triangle-fill"></i> Gagal memuat daftar member: <?= e($customerLoadError); ?> — buka menu System Upgrade lalu muat ulang halaman ini.</small>
@@ -1675,6 +1692,16 @@ if (typeof window.Html5Qrcode === 'undefined') {
             redeem.max = points;
             if(parseInt(redeem.value || '0', 10) > points) redeem.value = points;
         }
+    }
+
+    function updateReferralMember(){
+        const select = qs('#referrerMemberTheme');
+        const phone = qs('#referrerPhoneTheme');
+        const info = qs('#referrerInfoTheme');
+        if(!select || !phone) return;
+        const opt = select.options[select.selectedIndex];
+        phone.value = opt?.dataset.referrerPhone || '';
+        if(info && phone.value) info.textContent = 'Pengajak terpilih: ' + (opt.dataset.referrerName || opt.textContent.trim()) + '. Mendapat 50% dari poin reguler Customer Baru.';
     }
 
     function formatLocalDate(date){
@@ -2244,7 +2271,8 @@ if (typeof window.Html5Qrcode === 'undefined') {
 
     document.addEventListener('change', function(e){
         if(e.target.matches('#promoSelectTheme')) applySelectedPromo(true);
-        if(e.target.matches('#paymentMethodTheme,#customerTheme')) updateTotals();
+        if(e.target.matches('#referrerMemberTheme')) updateReferralMember();
+        if(e.target.matches('#paymentMethodTheme,#customerTheme,#referrerMemberTheme')) updateTotals();
         if(e.target.matches('#priceLevelTheme')){ applyPriceLevelToCart(); render(); }
         if(e.target.matches('#posSortTheme')) sortProductCards(e.target.value);
     });

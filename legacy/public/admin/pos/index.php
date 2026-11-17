@@ -10,7 +10,6 @@ require_once __DIR__ . '/../bundles/_helpers.php';
 require_once __DIR__ . '/../locations/_helpers.php';
 require_once __DIR__ . '/../debts/_helpers.php';
 require_once __DIR__ . '/../prices/_helpers.php';
-require_once __DIR__ . '/../../../app/Modules/CatalogFast.php';
 require_once __DIR__ . '/../shifts/_helpers.php';
 
 $pageTitle = 'Kasir POS';
@@ -375,19 +374,15 @@ function pos_theme_pakasir_create_qris(string $orderId, float $amount): array
     if ($config['project'] === '' || $config['api_key'] === '') {
         throw new Exception('Konfigurasi Pakasir belum diisi. Buka menu Pengaturan lalu isi Slug Project Pakasir dan API Key Pakasir.');
     }
-    $roundedAmount = (int)round($amount);
-    if ($roundedAmount < 500 || $roundedAmount > 10000000) {
-        throw new Exception('Nominal QRIS Pakasir v2 harus Rp500 s.d. Rp10.000.000.');
-    }
 
     $payload = [
-        'method' => 'qris',
-        'amount' => $roundedAmount,
+        'project' => $config['project'],
+        'order_id' => $orderId,
+        'amount' => (int) round($amount),
+        'api_key' => $config['api_key'],
     ];
 
-    // Pakasir API v2: slug + order_id berada di URL, API key dikirim lewat X-Api-Key.
-    $url = 'https://app.pakasir.com/api/v2/create-transaction/'
-        . rawurlencode($config['project']) . '/' . rawurlencode($orderId);
+    $url = 'https://app.pakasir.com/api/transactioncreate/qris';
     $responseBody = false;
     $httpCode = 0;
 
@@ -396,15 +391,10 @@ function pos_theme_pakasir_create_qris(string $orderId, float $amount): array
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Accept: application/json',
-                'X-Api-Key: ' . $config['api_key'],
-            ],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
             CURLOPT_POSTFIELDS => json_encode($payload),
             CURLOPT_TIMEOUT => 25,
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => true,
         ]);
         $responseBody = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -412,19 +402,19 @@ function pos_theme_pakasir_create_qris(string $orderId, float $amount): array
         curl_close($ch);
 
         if ($responseBody === false) {
-            throw new Exception('Gagal konek ke Pakasir API v2: ' . ($curlError ?: 'unknown error'));
+            throw new Exception('Gagal konek ke QRIS: ' . ($curlError ?: 'unknown error'));
         }
     } else {
         $context = stream_context_create([
             'http' => [
                 'method' => 'POST',
-                'header' => "Content-Type: application/json\r\nAccept: application/json\r\nX-Api-Key: {$config['api_key']}\r\n",
+                'header' => "Content-Type: application/json\r\nAccept: application/json\r\n",
                 'content' => json_encode($payload),
                 'timeout' => 25,
                 'ignore_errors' => true,
             ],
         ]);
-        $responseBody = @file_get_contents($url, false, $context);
+        $responseBody = file_get_contents($url, false, $context);
         if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
             $httpCode = (int) $m[1];
         }
@@ -433,42 +423,25 @@ function pos_theme_pakasir_create_qris(string $orderId, float $amount): array
     $json = json_decode((string) $responseBody, true);
 
     if (!is_array($json)) {
-        throw new Exception('Respon Pakasir API v2 tidak valid: ' . substr((string) $responseBody, 0, 180));
+        throw new Exception('Respon QRIS tidak valid: ' . substr((string) $responseBody, 0, 180));
     }
 
     if ($httpCode >= 400) {
         $msg = $json['message'] ?? $json['error'] ?? 'HTTP ' . $httpCode;
-        throw new Exception('Pakasir API v2 menolak transaksi: ' . $msg);
+        throw new Exception('Provider QRIS menolak transaksi: ' . $msg);
     }
 
-    if (empty($json['txn_id']) || empty($json['qr_string'])) {
+    if (empty($json['payment']) || empty($json['payment']['payment_number'])) {
         $msg = $json['message'] ?? $json['error'] ?? 'QRIS tidak berhasil dibuat.';
-        throw new Exception('Gagal membuat QRIS Pakasir v2: ' . $msg);
+        throw new Exception('Gagal membuat QRIS: ' . $msg);
     }
 
-    // Normalisasi agar view lama tetap kompatibel sambil menyimpan field native v2.
-    return [
-        'api_version' => 'v2',
-        'txn_id' => (string)($json['txn_id'] ?? ''),
-        'project' => (string)($json['project'] ?? $config['project']),
-        'order_id' => (string)($json['order_id'] ?? $orderId),
-        'amount' => (int)($json['amount'] ?? round($amount)),
-        'fee' => (int)($json['fee'] ?? 0),
-        'total_payment' => (int)($json['total_payment'] ?? ($json['amount'] ?? round($amount))),
-        'payment_method' => (string)($json['payment_method'] ?? 'qris'),
-        'qr_string' => (string)($json['qr_string'] ?? ''),
-        'payment_number' => (string)($json['qr_string'] ?? ''),
-        'va_number' => (string)($json['va_number'] ?? ''),
-        'expired_at' => (string)($json['expired_at'] ?? ''),
-        'is_sandbox' => (bool)($json['is_sandbox'] ?? false),
-    ];
+    return $json['payment'];
 }
 
 function pos_theme_pack_pakasir_note(array $payment): string
 {
     $safe = [
-        'api_version' => $payment['api_version'] ?? 'v2',
-        'txn_id' => $payment['txn_id'] ?? '',
         'project' => $payment['project'] ?? '',
         'order_id' => $payment['order_id'] ?? '',
         'amount' => (int) ($payment['amount'] ?? 0),
@@ -477,10 +450,7 @@ function pos_theme_pack_pakasir_note(array $payment): string
         'fee' => (int) ($payment['fee'] ?? 0),
         'total_payment' => (int) ($payment['total_payment'] ?? ($payment['amount'] ?? 0)),
         'payment_method' => $payment['payment_method'] ?? 'qris',
-        'payment_number' => $payment['payment_number'] ?? ($payment['qr_string'] ?? ''),
-        'qr_string' => $payment['qr_string'] ?? ($payment['payment_number'] ?? ''),
-        'va_number' => $payment['va_number'] ?? '',
-        'is_sandbox' => (bool) ($payment['is_sandbox'] ?? false),
+        'payment_number' => $payment['payment_number'] ?? '',
         'expired_at' => $payment['expired_at'] ?? '',
     ];
 
@@ -540,6 +510,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $paymentMethod = 'cash';
         }
         $customerId = (int) ($_POST['customer_id'] ?? 0);
+        $referrerCustomerId = (int) ($_POST['referrer_customer_id'] ?? 0);
         $referrerPhone = trim((string) ($_POST['referrer_phone'] ?? ''));
         $redeemPoints = max(0, (int) ($_POST['redeem_points'] ?? 0));
         $note = trim($_POST['note'] ?? '');
@@ -678,16 +649,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($referrerPhone !== '') {
-            if (!$customer) throw new Exception('Pilih Customer Baru/member terlebih dahulu sebelum mengisi Nomor HP Pengajak.');
-            if (pos_theme_normalize_phone((string) ($customer['phone'] ?? '')) === pos_theme_normalize_phone($referrerPhone)) throw new Exception('Nomor HP Pengajak tidak boleh sama dengan nomor HP pelanggan baru.');
-            $referrer = pos_theme_find_customer_by_phone($db, $referrerPhone);
-            if (!$referrer) throw new Exception('Nomor HP Pengajak tidak ditemukan. Periksa nomor pelanggan lama.');
+            if (!$customer) {
+                throw new Exception('Pilih Customer Baru/member terlebih dahulu sebelum mengisi Nomor HP Pengajak.');
+            }
+            if (pos_theme_normalize_phone((string) ($customer['phone'] ?? '')) === pos_theme_normalize_phone($referrerPhone)) {
+                throw new Exception('Nomor HP Pengajak tidak boleh sama dengan nomor HP pelanggan baru.');
+            }
+            $referrer = $referrerCustomerId > 0
+                ? $db->prepare("SELECT id, name, phone FROM customers WHERE id = ? AND status = 'active' LIMIT 1")
+                : null;
+            if ($referrer) {
+                $referrer->execute([$referrerCustomerId]);
+                $referrer = $referrer->fetch() ?: null;
+                if ($referrer && pos_theme_normalize_phone((string) $referrer['phone']) !== pos_theme_normalize_phone($referrerPhone)) $referrer = null;
+            }
+            if (!$referrer) $referrer = pos_theme_find_customer_by_phone($db, $referrerPhone);
+            if (!$referrer) {
+                throw new Exception('Nomor HP Pengajak tidak ditemukan. Periksa nomor pelanggan lama.');
+            }
             $existingReferral = $db->prepare("SELECT id FROM customer_referrals WHERE referred_customer_id = ? LIMIT 1");
             $existingReferral->execute([(int) $customer['id']]);
-            if ($existingReferral->fetchColumn()) throw new Exception('Referral pelanggan ini sudah pernah dipakai. Referral hanya berlaku pada transaksi pertama.');
+            if ($existingReferral->fetchColumn()) {
+                throw new Exception('Referral pelanggan ini sudah pernah dipakai. Referral hanya berlaku pada transaksi pertama.');
+            }
             $priorTransactions = $db->prepare("SELECT COUNT(*) FROM transactions WHERE customer_id = ? AND status = 'success'");
             $priorTransactions->execute([(int) $customer['id']]);
-            if ((int) $priorTransactions->fetchColumn() > 0) throw new Exception('Referral hanya dapat dipakai saat transaksi pertama Customer Baru.');
+            if ((int) $priorTransactions->fetchColumn() > 0) {
+                throw new Exception('Referral hanya dapat dipakai saat transaksi pertama Customer Baru.');
+            }
         }
 
         if ($redeemPoints > 0) {
@@ -939,13 +928,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,variant_id,product_name,variant_name,variant_sku,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,?,?,?,0,?,NOW())");
                     $stmt->execute([$transactionId,$product['id'],$variantId,$product['name'],$variantName,$variantSku,$item['qty'],$item['unit_price'],$item['price_level']??'retail',$item['purchase_price'],$item['subtotal']]);
                 }else{
-                    $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,product_name,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,0,?,NOW())");
+                    $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,product_name,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,?,0,?,NOW())");
                     $stmt->execute([$transactionId,$product['id'],$product['name'].' - '.$variantName,$item['qty'],$item['unit_price'],$item['price_level']??'retail',$item['purchase_price'],$item['subtotal']]);
                 }
                 marketplace_v16_set_variant_stock($db,$variantId,$currentBranchId,$stockAfter,(int)($variant['minimum_stock']??0));marketplace_v16_sync_parent_stock($db,(int)$product['id'],$currentBranchId);
                 $moveNote='Penjualan varian '.$variantName.' - '.$invoice;
             }else{
-                $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,product_name,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,0,?,NOW())");
+                $stmt=$db->prepare("INSERT INTO transaction_items(transaction_id,item_type,product_id,product_name,qty,unit_price,price_level,purchase_price,discount,subtotal,created_at) VALUES(?,'product',?,?,?,?,?,?,?,0,?,NOW())");
                 $stmt->execute([$transactionId,$product['id'],$product['name'],$item['qty'],$item['unit_price'],$item['price_level']??'retail',$item['purchase_price'],$item['subtotal']]);
                 branch_sync_product($db,(int)$product['id']);$db->prepare('UPDATE product_branch_stocks SET stock=?,updated_at=NOW() WHERE branch_id=? AND product_id=?')->execute([$stockAfter,$currentBranchId,$product['id']]);$m=$db->prepare('SELECT is_main FROM branches WHERE id=? LIMIT 1');$m->execute([$currentBranchId]);if((int)$m->fetchColumn()===1)$db->prepare('UPDATE products SET stock=?,updated_at=NOW() WHERE id=?')->execute([$stockAfter,$product['id']]);$moveNote='Penjualan '.$invoice;
             }
@@ -1024,55 +1013,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// POS V17: load only columns needed by the cashier. Images/descriptions are not
-// selected and variants are fetched in one bulk query (no N+1 per product).
-$stmtProducts = $db->prepare("SELECT p.id,p.category_id,p.product_code,p.barcode,p.name,p.purchase_price,p.selling_price,p.stock,p.minimum_stock,p.unit,p.updated_at,
-    c.name AS category_name,c.color AS category_color,{$posStockExpr} AS stock,{$posMinStockExpr} AS minimum_stock,
-    pl.area,pl.rack,pl.shelf,pl.bin_box
-    FROM products p
-    LEFT JOIN categories c ON c.id=p.category_id
-    LEFT JOIN product_branch_stocks pbs ON pbs.product_id=p.id AND pbs.branch_id=?
-    LEFT JOIN product_locations pl ON pl.product_id=p.id AND pl.branch_id=?
-    WHERE p.is_active=1
-    ORDER BY CASE WHEN ({$posStockExpr}) <= 0 THEN 1 ELSE 0 END ASC,p.name ASC");
+$stmtProducts = $db->prepare("SELECT p.*, c.name AS category_name, c.color AS category_color, {$posStockExpr} AS stock, {$posMinStockExpr} AS minimum_stock, pl.area, pl.rack, pl.shelf, pl.bin_box FROM products p LEFT JOIN categories c ON c.id = p.category_id LEFT JOIN product_branch_stocks pbs ON pbs.product_id = p.id AND pbs.branch_id = ? LEFT JOIN product_locations pl ON pl.product_id = p.id AND pl.branch_id = ? WHERE p.is_active = 1 ORDER BY CASE WHEN ({$posStockExpr}) <= 0 THEN 1 ELSE 0 END ASC, p.name ASC");
 $stmtProducts->execute([$currentBranchId, $currentBranchId]);
-$baseProducts = $stmtProducts->fetchAll() ?: [];
-$productIds = array_map(fn($row)=>(int)$row['id'], $baseProducts);
-$variantsByProduct = catalog_fast_variants_by_product($db, $productIds, $currentBranchId, true);
-$posPriceMap = catalog_fast_price_levels($db, $productIds);
-$posCatalogProducts = [];
-foreach ($baseProducts as $pp) {
-    $vars = $variantsByProduct[(int)$pp['id']] ?? [];
-    if ($vars) {
-        foreach ($vars as $v) {
-            $r = $pp;
-            $label = (string)($v['display_name'] ?? $v['name'] ?? 'Varian');
-            $r['_variant_id'] = (int)$v['id'];
-            $r['_product_name'] = (string)$pp['name'];
-            $r['_variant_name'] = $label;
-            $r['_variant_sku'] = (string)($v['sku'] ?? '');
-            $r['name'] = $pp['name'] . ' - ' . $label;
-            $r['product_code'] = ($v['sku'] ?? '') ?: $pp['product_code'];
-            $r['barcode'] = ($v['barcode'] ?? '') ?: $pp['barcode'];
-            $r['selling_price'] = (float)($v['selling_price'] ?? 0) > 0 ? (float)$v['selling_price'] : (float)$pp['selling_price'];
-            $r['purchase_price'] = (float)($v['purchase_price'] ?? 0) > 0 ? (float)$v['purchase_price'] : (float)$pp['purchase_price'];
-            $r['stock'] = (int)($v['stock'] ?? 0);
-            $posCatalogProducts[] = $r;
-        }
-    } else {
-        $pp['_variant_id'] = 0;
-        $pp['_product_name'] = (string)$pp['name'];
-        $pp['_variant_name'] = '';
-        $pp['_variant_sku'] = '';
-        $posCatalogProducts[] = $pp;
-    }
+$products = $stmtProducts->fetchAll();
+$posCatalogProducts=[];
+foreach($products as $pp){
+    $vars=marketplace_v15_variants($db,(int)$pp['id'],$currentBranchId,true);
+    if($vars){foreach($vars as $v){$r=$pp;$label=(string)($v['display_name']??$v['name']);$r['_variant_id']=(int)$v['id'];$r['_variant_name']=$label;$r['_variant_sku']=$v['sku']??'';$r['name']=$pp['name'].' - '.$label;$r['product_code']=$v['sku']?:$pp['product_code'];$r['barcode']=$v['barcode']?:$pp['barcode'];$r['selling_price']=(float)$v['selling_price']>0?(float)$v['selling_price']:(float)$pp['selling_price'];$r['purchase_price']=(float)$v['purchase_price']>0?(float)$v['purchase_price']:(float)$pp['purchase_price'];$r['stock']=(int)$v['stock'];$r['image']=$v['image_path']?:$pp['image'];$posCatalogProducts[]=$r;}}
+    else{$pp['_variant_id']=0;$pp['_variant_name']='';$posCatalogProducts[]=$pp;}
 }
-usort($posCatalogProducts, static function(array $a,array $b): int {
-    $az = (int)$a['stock'] <= 0 ? 1 : 0;
-    $bz = (int)$b['stock'] <= 0 ? 1 : 0;
-    return ($az <=> $bz) ?: strnatcasecmp((string)$a['name'], (string)$b['name']);
-});
-$products = $posCatalogProducts;
+$products=$posCatalogProducts;
 
 $bundleRows = $db->query("SELECT * FROM product_bundles WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
 $posBundles = [];
@@ -1131,7 +1081,7 @@ require_once __DIR__ . '/../../layouts/admin-header.php';
 require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 ?>
 
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/locations.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/locations.css?v=' . APP_ASSET_VERSION); ?>">
 
 <style>
 .member-empty-note.pos-member-error{color:#c0392b;display:block;margin-top:6px;}
@@ -1169,7 +1119,7 @@ a.pos-member-add-link {
 }
 </style>
 
-<link rel="stylesheet" href="<?= legacy_base_url('assets/css/debts.css?v=' . APP_ASSET_VERSION); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/debts.css?v=' . APP_ASSET_VERSION); ?>">
 <main class="admin-main pos-main">
     <header class="admin-topbar page-topbar pos-topbar">
         <button class="sidebar-toggle" id="sidebarToggle">
@@ -1226,15 +1176,7 @@ a.pos-member-add-link {
 
             <div class="pos-products-grid" id="posProductsGridTheme">
                 <?php foreach ($products as $product): ?>
-                    <?php
-                    $posPrices = $posPriceMap[(int)$product['id']] ?? [];
-                    foreach (['retail','grosir','reseller','member'] as $lv) {
-                        if (!isset($posPrices[$lv]['price']) || (float)$posPrices[$lv]['price'] <= 0) $posPrices[$lv]['price'] = (float)$product['selling_price'];
-                    }
-                    if ((int)($product['_variant_id']??0) > 0) {
-                        foreach (['retail','grosir','reseller','member'] as $lv) $posPrices[$lv]['price'] = (float)$product['selling_price'];
-                    }
-                    ?>
+                    <?php $posPrices = price_all_for_product($db, (int)$product['id']); if((int)($product['_variant_id']??0)>0){foreach(['retail','grosir','reseller','member'] as $lv)$posPrices[$lv]['price']=(float)$product['selling_price'];} ?>
                     <button
                         type="button"
                         class="pos-product-card"
@@ -1242,8 +1184,6 @@ a.pos-member-add-link {
                         data-id="<?= e($product['id']); ?>"
                         data-variant-id="<?= e((int)($product['_variant_id']??0)); ?>"
                         data-name="<?= e($product['name']); ?>"
-                        data-product-name="<?= e($product['_product_name'] ?? $product['name']); ?>"
-                        data-variant-name="<?= e($product['_variant_name'] ?? ''); ?>"
                         data-code="<?= e($product['product_code'] ?? ''); ?>"
                         data-barcode="<?= e($product['barcode'] ?? ''); ?>"
                         data-price="<?= e((float)($posPrices['retail']['price'] ?? $product['selling_price'])); ?>"
@@ -1255,18 +1195,17 @@ a.pos-member-add-link {
                         data-unit="<?= e($product['unit'] ?? 'pcs'); ?>"
                         data-category="<?= e($product['category_name'] ?? 'Tanpa kategori'); ?>"
                     >
-                        <div class="pos-product-img" aria-hidden="true"><i class="bi bi-box-seam"></i></div>
+                        <div class="pos-product-img">
+                            <?php if (!empty($product['image'])): ?>
+                                <i class="bi bi-box-seam"></i>
+                            <?php else: ?>
+                                <i class="bi bi-box-seam"></i>
+                            <?php endif; ?>
+                        </div>
 
                         <div class="pos-product-info">
-                            <b class="pos-product-title"><?= e($product['_product_name'] ?? $product['name']); ?></b>
-                            <?php if (!empty($product['_variant_name'])): ?>
-                                <span class="pos-product-variant"><i class="bi bi-diagram-3"></i> Varian: <b><?= e($product['_variant_name']); ?></b></span>
-                            <?php else: ?>
-                                <span class="pos-product-variant is-parent"><i class="bi bi-box"></i> Produk tanpa varian</span>
-                            <?php endif; ?>
-                            <span class="pos-product-identifiers"><i class="bi bi-upc-scan"></i> Barcode: <b><?= e(($product['barcode'] ?? '') !== '' ? $product['barcode'] : '-'); ?></b></span>
-                            <span class="pos-product-code"><i class="bi bi-hash"></i> Kode: <b><?= e(($product['product_code'] ?? '') !== '' ? $product['product_code'] : '-'); ?></b></span>
-                            <span class="pos-product-stockline"><?= e($product['category_name'] ?? 'Tanpa kategori'); ?> • Stok <?= e($product['stock']); ?> <?= e($product['unit'] ?? 'pcs'); ?></span>
+                            <b><?= e($product['name']); ?></b>
+                            <span><?= e($product['category_name'] ?? 'Tanpa kategori'); ?> • Stok <?= e($product['stock']); ?></span>
                             <strong><?= rupiah($product['selling_price']); ?></strong>
                         </div>
 
@@ -1330,7 +1269,7 @@ a.pos-member-add-link {
                 <div class="member-box-theme">
                     <div class="member-label-row-theme">
                         <label class="mini-label">Member Pelanggan</label>
-                        <a href="<?= legacy_base_url('admin/customers/create.php'); ?>" class="member-add-link-theme pos-member-add-link"><i class="bi bi-person-plus"></i> Tambah Member</a>
+                        <a href="<?= base_url('admin/customers/create.php'); ?>" class="member-add-link-theme pos-member-add-link"><i class="bi bi-person-plus"></i> Tambah Member</a>
                     </div>
                     <div class="member-search-picker" id="memberSearchPickerTheme">
                         <div class="member-search-input-wrap">
@@ -1354,9 +1293,17 @@ a.pos-member-add-link {
                         <?php endforeach; ?>
                     </select>
                     <div class="member-referral-field-theme">
-                        <label class="mini-label" for="referrerPhoneTheme">Nomor HP Pengajak <span>(Pelanggan Lama / Referrer)</span></label>
-                        <input type="tel" name="referrer_phone" id="referrerPhoneTheme" inputmode="tel" autocomplete="off" placeholder="08xxxxxxxxxx">
-                        <small>Referral hanya berlaku pada transaksi pertama Customer Baru. Pengajak mendapat 50% dari poin reguler Customer Baru.</small>
+                        <label class="mini-label" for="referrerMemberTheme">Pengajak <span>(Pelanggan Lama / Referrer)</span></label>
+                        <select name="referrer_customer_id" id="referrerMemberTheme">
+                            <option value="" data-referrer-phone="">Pilih member pengajak...</option>
+                            <?php foreach ($customers as $referrerOption): ?>
+                                <option value="<?= e($referrerOption['id']); ?>" data-referrer-phone="<?= e($referrerOption['phone'] ?? ''); ?>" data-referrer-name="<?= e($referrerOption['name']); ?>">
+                                    <?= e($referrerOption['name']); ?><?= !empty($referrerOption['phone']) ? ' — ' . e($referrerOption['phone']) : ''; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <input type="hidden" name="referrer_phone" id="referrerPhoneTheme" value="">
+                        <small id="referrerInfoTheme">Pilih nama member lama yang mengajak Customer Baru. Referral hanya berlaku pada transaksi pertama dan pengajak mendapat 50% poin reguler.</small>
                     </div>
                     <?php if ($customerLoadError !== ''): ?>
                         <small class="member-empty-note pos-member-error"><i class="bi bi-exclamation-triangle-fill"></i> Gagal memuat daftar member: <?= e($customerLoadError); ?> — buka menu System Upgrade lalu muat ulang halaman ini.</small>
@@ -1504,7 +1451,7 @@ a.pos-member-add-link {
                     <?php if ($manualQrisConfig['available']): ?>
                     <div id="manualQrisBlockTheme" class="manual-qris-box" style="display:none;">
                         <div class="manual-qris-head"><i class="bi bi-qr-code-scan"></i><div><b><?= e($manualQrisConfig['label']); ?></b><span>Scan QRIS toko, lalu konfirmasi setelah pembayaran benar-benar diterima.</span></div></div>
-                        <img src="<?= legacy_base_url($manualQrisConfig['image']); ?>" alt="<?= e($manualQrisConfig['label']); ?>">
+                        <img src="<?= base_url($manualQrisConfig['image']); ?>" alt="<?= e($manualQrisConfig['label']); ?>">
                         <label class="manual-qris-confirm"><input type="checkbox" name="manual_qris_confirm" id="manualQrisConfirmTheme" value="1"> <span>Saya sudah menerima pembayaran QRIS ini</span></label>
                     </div>
                     <?php endif; ?>
@@ -1745,6 +1692,16 @@ if (typeof window.Html5Qrcode === 'undefined') {
             redeem.max = points;
             if(parseInt(redeem.value || '0', 10) > points) redeem.value = points;
         }
+    }
+
+    function updateReferralMember(){
+        const select = qs('#referrerMemberTheme');
+        const phone = qs('#referrerPhoneTheme');
+        const info = qs('#referrerInfoTheme');
+        if(!select || !phone) return;
+        const opt = select.options[select.selectedIndex];
+        phone.value = opt?.dataset.referrerPhone || '';
+        if(info && phone.value) info.textContent = 'Pengajak terpilih: ' + (opt.dataset.referrerName || opt.textContent.trim()) + '. Mendapat 50% dari poin reguler Customer Baru.';
     }
 
     function formatLocalDate(date){
@@ -2314,7 +2271,8 @@ if (typeof window.Html5Qrcode === 'undefined') {
 
     document.addEventListener('change', function(e){
         if(e.target.matches('#promoSelectTheme')) applySelectedPromo(true);
-        if(e.target.matches('#paymentMethodTheme,#customerTheme')) updateTotals();
+        if(e.target.matches('#referrerMemberTheme')) updateReferralMember();
+        if(e.target.matches('#paymentMethodTheme,#customerTheme,#referrerMemberTheme')) updateTotals();
         if(e.target.matches('#priceLevelTheme')){ applyPriceLevelToCart(); render(); }
         if(e.target.matches('#posSortTheme')) sortProductCards(e.target.value);
     });
