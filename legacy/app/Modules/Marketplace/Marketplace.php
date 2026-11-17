@@ -1109,6 +1109,27 @@ function marketplace_payment_timeout_minutes(): int
     return max(1, min(1440, $m));
 }
 
+/**
+ * V17.0.73 — kode unik QRIS marketplace (1-99), supaya nominal tiap pembayaran
+ * QRIS berbeda dan tidak mudah tertukar. Dihindari bentrok dengan QRIS lain yang
+ * masih pending agar nominal totalnya unik.
+ */
+function marketplace_qris_unique_code(PDO $db, int $baseAmount): int
+{
+    for ($i = 0; $i < 25; $i++) {
+        $code = random_int(1, 99);
+        $target = $baseAmount + $code;
+        try {
+            $st = $db->prepare("SELECT COUNT(*) FROM online_orders WHERE payment_method = 'qris' AND payment_status = 'pending' AND payment_total = ?");
+            $st->execute([$target]);
+            if ((int) $st->fetchColumn() === 0) return $code;
+        } catch (Throwable $e) {
+            return random_int(1, 99);
+        }
+    }
+    return random_int(1, 99);
+}
+
 function marketplace_expire_if_needed(PDO $db, array $order): array
 {
     if (!in_array((string) ($order['payment_status'] ?? ''), ['pending', 'error'], true)) return $order;
@@ -1708,6 +1729,14 @@ function marketplace_create_order(PDO $db, array $payload): array
         $grandTotal = max(0, $subtotal - $discount - $pointsDiscount + $shippingCost - $shippingDiscount);
         $grandAmount = (int) round($grandTotal);
         if($grandAmount<=0) throw new RuntimeException('Total pembayaran tidak valid setelah penukaran poin.');
+
+        // V17.0.73 — kode unik QRIS marketplace (1-99): nominal tiap QRIS berbeda.
+        $marketplaceQrisUniqueCode = 0;
+        if (!$isCod && (string) $paymentMethod === 'qris') {
+            $marketplaceQrisUniqueCode = marketplace_qris_unique_code($db, $grandAmount);
+            $grandAmount += $marketplaceQrisUniqueCode;
+            $customerNote = trim($customerNote . "\n[QRIS_UNIQUE_CODE]" . $marketplaceQrisUniqueCode . "[/QRIS_UNIQUE_CODE]");
+        }
 
         $stmt = $db->prepare("INSERT INTO online_orders
             (order_number,public_token,idempotency_key,branch_id,customer_id,recipient_name,recipient_phone,recipient_email,address,destination_id,destination_label,province,city,district,subdistrict,postal_code,customer_note,total_weight_gram,subtotal,discount,voucher_code,shipping_cost,shipping_discount,points_redeemed,points_discount,points_redeemed_at,grand_total,courier_code,courier_name,courier_service,courier_description,shipping_etd,payment_method,payment_amount,payment_status,order_status,fulfillment_status,created_at)

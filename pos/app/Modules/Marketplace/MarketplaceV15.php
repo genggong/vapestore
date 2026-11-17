@@ -311,12 +311,16 @@ function marketplace_v159_variant_options(PDO $db,int $productId,bool $activeOnl
     }catch(Throwable $e){return [];}
 }
 function marketplace_v159_variant_attributes(PDO $db,int $variantId):array{
+    // Cache per request: dipanggil dr loop POS produk→varian, per varian 2x
+    // (attributes + label). Tanpa cache ini POS lambat pada katalog besar.
+    static $cache=[];$key=spl_object_id($db).':'.$variantId;
+    if(array_key_exists($key,$cache))return $cache[$key];
     try{
         marketplace_v15_install($db);
-        if(!marketplace_table_exists($db,'marketplace_variant_value_map')) return [];
+        if(!marketplace_table_exists($db,'marketplace_variant_value_map')) return $cache[$key]=[];
         $s=$db->prepare("SELECT o.id option_id,o.name option_name,v.id value_id,v.value,v.color_hex FROM marketplace_variant_value_map m JOIN marketplace_variant_option_values v ON v.id=m.option_value_id JOIN marketplace_variant_options o ON o.id=v.option_id WHERE m.variant_id=? ORDER BY o.sort_order ASC,o.id ASC,v.sort_order ASC,v.id ASC");
-        $s->execute([$variantId]);return $s->fetchAll()?:[];
-    }catch(Throwable $e){return [];}
+        $s->execute([$variantId]);return $cache[$key]=$s->fetchAll()?:[];
+    }catch(Throwable $e){return $cache[$key]=[];}
 }
 function marketplace_v159_variant_label(PDO $db,int $variantId,string $fallback=''):string{
     $attrs=marketplace_v159_variant_attributes($db,$variantId);$parts=[];foreach($attrs as $a){$v=trim((string)($a['value']??''));if($v!=='')$parts[]=$v;}return $parts?implode(' / ',$parts):$fallback;

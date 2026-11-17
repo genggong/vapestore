@@ -7,32 +7,38 @@
 
 function marketplace_doctor_table_columns(PDO $db, string $table): array
 {
+    // Cache INFORMATION_SCHEMA per request. POS membuka katalog dengan loop
+    // produk→varian yang memanggil helper ini berkali-kali; tanpa cache tiap
+    // produk memicu query metadata sendiri (penyebab utama POS lambat).
+    static $cache = [];
+    $key = spl_object_id($db) . ':' . $table;
+    if (array_key_exists($key, $cache)) return $cache[$key];
+
+    $result = [];
     try {
         $stmt = $db->prepare("SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION");
         $stmt->execute([$table]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        $out = [];
         foreach ($rows as $r) {
             $name = (string)($r['COLUMN_NAME'] ?? '');
             if ($name === '') continue;
             // Keep Field for compatibility with the old SHOW COLUMNS shape.
             $r['Field'] = $name;
-            $out[$name] = $r;
+            $result[$name] = $r;
         }
-        if ($out) return $out;
+        if ($result) return $cache[$key] = $result;
     } catch (Throwable $e) {
         // Fall back to SHOW COLUMNS using a validated identifier, never a bound SHOW placeholder.
     }
     try {
-        if (!preg_match('/^[A-Za-z0-9_]+$/', $table)) return [];
+        if (!preg_match('/^[A-Za-z0-9_]+$/', $table)) return $cache[$key] = [];
         $rows = $db->query("SHOW COLUMNS FROM `{$table}`")->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        $out = [];
         foreach ($rows as $r) {
             $name = (string)($r['Field'] ?? '');
-            if ($name !== '') $out[$name] = $r;
+            if ($name !== '') $result[$name] = $r;
         }
-        return $out;
-    } catch (Throwable $e) { return []; }
+        return $cache[$key] = $result;
+    } catch (Throwable $e) { return $cache[$key] = []; }
 }
 
 function marketplace_doctor_index_exists(PDO $db, string $table, string $index): bool
