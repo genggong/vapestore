@@ -98,7 +98,33 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 </style>
 
 <main class="admin-main transaction-page-space">
+    <?php if ($casakuPayment && ($trx['payment_method'] ?? '') === 'qris_casaku'): ?>
+    <?php $casakuStatus = strtolower((string)($trx['status'] ?? 'pending')); ?>
+    <section class="casaku-pay-panel" id="casakuPayPanel" data-trx="<?= e($trx['id']); ?>" data-status="<?= e($casakuStatus); ?>">
+        <div class="casaku-pay-head">
+            <i class="bi bi-qr-code-scan"></i>
+            <div>
+                <h3><?= $casakuStatus === 'success' ? 'Pembayaran QRIS Berhasil' : 'Pembayaran QRIS CasaKu'; ?></h3>
+                <p><?= $casakuStatus === 'success' ? 'Pembayaran sudah diterima. Invoice di bawah sudah final.' : 'Minta pelanggan scan QR di bawah. Invoice keluar setelah pembayaran sukses.'; ?></p>
+            </div>
+        </div>
+        <div class="casaku-pay-qr"><div class="casaku-qr-box"><div id="casakuQr" data-qr="<?= e($casakuPayment['qr_string'] ?? ''); ?>"></div></div></div>
+        <div class="casaku-status<?= $casakuStatus === 'success' ? ' is-success' : ''; ?>" id="casakuStatusBar">
+            <span class="casaku-dot"></span>
+            <span id="casakuStatusText"><?= $casakuStatus === 'success' ? 'Pembayaran berhasil dikonfirmasi.' : 'Menunggu pembayaran QRIS. Panel ini otomatis memeriksa status.'; ?></span>
+        </div>
+        <div class="casaku-pay-info">
+            <div><span>Order ID</span><b><?= e($casakuPayment['order_id'] ?? $trx['invoice_number']); ?></b></div>
+            <div><span>Total Bayar</span><b><?= rupiah($casakuPayment['total_payment'] ?? $casakuPayment['amount'] ?? $trx['grand_total']); ?></b></div>
+            <?php if (!empty($casakuPayment['expired_at'])): ?><div><span>Berlaku s.d.</span><b><?= e(date('d/m/Y H:i', strtotime($casakuPayment['expired_at']))); ?></b></div><?php endif; ?>
+        </div>
+        <?php if ($casakuStatus !== 'success'): ?>
+        <button type="button" class="casaku-check-btn" id="casakuCheckBtn"><i class="bi bi-arrow-repeat"></i> Cek Status Pembayaran</button>
+        <?php endif; ?>
+    </section>
+    <?php endif; ?>
     <?php if (!empty($_GET['pos_success'])): ?>
+
 <?php endif; ?>
     <header class="admin-topbar page-topbar">
         <button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button>
@@ -203,10 +229,6 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
             </div>
         </div>
     </section>
-    <?php endif; ?>
-
-    <?php if ($casakuPayment && ($trx['payment_method'] ?? '') === 'qris_casaku'): ?>
-    <section class="pakasir-card"><div class="pakasir-card-head"><i class="bi bi-qr-code-scan"></i><div><h3>Pembayaran QRIS CasaKu</h3><p>Scan QR berikut untuk menyelesaikan pembayaran.</p></div></div><div class="pakasir-live-status" id="casakuLiveStatus" data-transaction-id="<?= e($trx['id']); ?>"><span class="pakasir-live-dot"></span><span id="casakuLiveText">Menunggu pembayaran QRIS CasaKu.</span><button type="button" class="pakasir-check-btn" id="casakuManualCheck">Cek Status</button></div><div class="pakasir-qr-wrap"><div class="pakasir-qr-box"><div id="casakuQr" data-qr="<?= e($casakuPayment['qr_string'] ?? ''); ?>"></div></div><div class="pakasir-pay-lines"><div class="pakasir-pay-line"><span>Order ID</span><b><?= e($casakuPayment['order_id'] ?? $trx['invoice_number']); ?></b></div><div class="pakasir-pay-line total-qris"><span>Total Bayar</span><b><?= rupiah($casakuPayment['total_payment'] ?? $casakuPayment['amount'] ?? $trx['grand_total']); ?></b></div><div class="pakasir-qr-fallback"><?= e($casakuPayment['qr_string'] ?? 'QR string tidak tersedia'); ?></div></div></div></section>
     <?php endif; ?>
 
     <?php if ($manualQrisPayment && ($trx['payment_method'] ?? '') === 'qris_manual'): ?>
@@ -345,18 +367,50 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 <?php if ($casakuPayment): ?>
+<style>
+.casaku-pay-panel{margin:0 0 18px;border:1px solid #c4b5fd;background:linear-gradient(180deg,#f5f3ff,#fff);border-radius:26px;padding:26px;box-shadow:0 20px 54px rgba(109,40,217,.14)}
+.casaku-pay-head{display:flex;gap:14px;align-items:flex-start}.casaku-pay-head i{font-size:34px;color:#7e22ce}.casaku-pay-head h3{margin:0;color:#5b21b6;font-weight:900;font-size:20px}.casaku-pay-head p{margin:4px 0 0;color:#6d28d9;font-size:14px;line-height:1.5}
+.casaku-pay-qr{display:flex;justify-content:center;margin:20px 0 8px}
+.casaku-qr-box{background:#fff;border:1px solid #ddd6fe;border-radius:22px;padding:16px;box-shadow:0 12px 34px rgba(88,28,135,.12)}
+.casaku-qr-box canvas,.casaku-qr-box img{display:block;width:260px;height:260px;max-width:100%}
+.casaku-status{margin:14px 0;padding:12px 16px;border-radius:16px;background:#fff;border:1px solid #e9d5ff;display:flex;align-items:center;gap:12px;color:#7e22ce;font-weight:800}
+.casaku-dot{width:13px;height:13px;border-radius:50%;background:#f59e0b;box-shadow:0 0 0 6px rgba(245,158,11,.15);flex:0 0 auto}
+.casaku-status.is-success{border-color:#bbf7d0;background:#f0fdf4;color:#15803d}.casaku-status.is-success .casaku-dot{background:#16a34a;box-shadow:0 0 0 6px rgba(22,163,74,.15)}
+.casaku-status.is-failed{border-color:#fecaca;background:#fef2f2;color:#b91c1c}.casaku-status.is-failed .casaku-dot{background:#dc2626;box-shadow:0 0 0 6px rgba(220,38,38,.15)}
+.casaku-pay-info{display:grid;gap:10px;margin:0 0 16px}
+.casaku-pay-info>div{display:flex;justify-content:space-between;gap:14px;border-bottom:1px dashed #ddd6fe;padding-bottom:10px}
+.casaku-pay-info span{color:#6d28d9}.casaku-pay-info b{color:#5b21b6;text-align:right}
+.casaku-check-btn{width:100%;border:0;border-radius:16px;padding:14px 16px;background:linear-gradient(135deg,#a855f7,#7e22ce);color:#fff;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 12px 26px rgba(126,34,206,.3)}
+.casaku-check-btn:hover{filter:brightness(1.06)}.casaku-check-btn:disabled{opacity:.65;cursor:not-allowed}
+@media(max-width:720px){.casaku-pay-panel{padding:20px}.casaku-qr-box canvas,.casaku-qr-box img{width:230px;height:230px}}
+</style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
- const qr=document.getElementById('casakuQr'), value=qr&&qr.dataset.qr;
- if(qr&&value&&window.QRCode)new QRCode(qr,{text:value,width:180,height:180,correctLevel:QRCode.CorrectLevel.M});
- const box=document.getElementById('casakuLiveStatus'), text=document.getElementById('casakuLiveText'), btn=document.getElementById('casakuManualCheck');
- if(!box||!text)return; let busy=false;
- const check=()=>{if(busy)return;busy=true;if(btn)btn.disabled=true;fetch('<?= base_url('admin/casaku/status.php'); ?>?id='+encodeURIComponent(box.dataset.transactionId),{credentials:'same-origin'}).then(r=>r.json()).then(j=>{if(j.success){text.textContent=j.message;if(j.status==='success'){box.classList.add('success');location.reload();}else if(j.status==='failed'){box.classList.add('failed');}}}).finally(()=>{busy=false;if(btn)btn.disabled=false;});};
- if(btn)btn.addEventListener('click',check); check(); setInterval(check,5000);
+ const qr=document.getElementById('casakuQr'),panel=document.getElementById('casakuPayPanel');
+ if(qr&&qr.dataset.qr&&window.QRCode)new QRCode(qr,{text:qr.dataset.qr,width:240,height:240,correctLevel:QRCode.CorrectLevel.M});
+ if(!panel||panel.dataset.status==='success')return;
+ const bar=document.getElementById('casakuStatusBar'),text=document.getElementById('casakuStatusText'),btn=document.getElementById('casakuCheckBtn');
+ function setStatus(s,msg){if(text)text.textContent=msg;if(bar){bar.classList.remove('is-success','is-failed');if(s==='success')bar.classList.add('is-success');else if(s==='failed')bar.classList.add('is-failed');}}
+ let busy=false;
+ function check(){
+  if(busy)return;busy=true;if(btn){btn.disabled=true;btn.innerHTML='<i class="bi bi-arrow-repeat"></i> Mengecek status...';}
+  fetch('<?= base_url('admin/casaku/status.php'); ?>?id='+encodeURIComponent(panel.dataset.trx),{credentials:'same-origin'})
+   .then(r=>r.json()).then(j=>{
+    if(!j.success){setStatus('pending',j.message||'Sedang memeriksa status.');return;}
+    setStatus(j.status,j.message);
+    if(j.status==='success'){setTimeout(function(){location.reload();},400);}
+   }).catch(function(){setStatus('pending','Gagal memeriksa status. Coba lagi.');})
+   .finally(function(){busy=false;if(btn){btn.disabled=false;btn.innerHTML='<i class="bi bi-arrow-repeat"></i> Cek Status Pembayaran';}});
+ }
+ if(btn)btn.addEventListener('click',check);
+ setTimeout(check,400);
+ setInterval(check,6000);
 });
 </script>
 <?php endif; ?>
+
+
 
 <?php if ($pakasirPayment): ?>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -373,10 +427,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <?php endif; ?>
 
 
-<?php if ($casakuPayment): ?>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>document.addEventListener('DOMContentLoaded',function(){const e=document.getElementById('casakuQr'),v=e&&e.dataset.qr;if(e&&v&&window.QRCode)new QRCode(e,{text:v,width:180,height:180,correctLevel:QRCode.CorrectLevel.M});});</script>
-<?php endif; ?>
+
 
 <?php if ($pakasirPayment): ?>
 <script>

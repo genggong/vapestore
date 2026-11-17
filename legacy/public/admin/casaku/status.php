@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../app/bootstrap.php';
 require_once __DIR__ . '/../../../app/Modules/Marketplace/Marketplace.php';
+require_once __DIR__ . '/../whatsapp/_helpers.php';
 Auth::requireLogin();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -27,6 +28,18 @@ function casaku_pos_apply_member_referral(PDO $db, array $trx): void
     if ((int)$st->fetchColumn() > 0) return;
     $db->prepare("INSERT INTO customer_points(customer_id,transaction_id,type,points,description,created_at) VALUES (?,?,'in',?,?,NOW())")->execute([$referrerId,$transactionId,$points,'Poin referral: '.($trx['invoice_number'] ?? '-')]);
     $db->prepare('UPDATE customers SET points=points+?,updated_at=NOW() WHERE id=?')->execute([$points,$referrerId]);
+    // Notifikasi WA otomatis ke referrer (sekali, saat referral baru dibuat). Gagal WA tidak menggagalkan transaksi.
+    try {
+        if (function_exists('wa_send_fonnte')) {
+            $rf = $db->prepare('SELECT name, points FROM customers WHERE id=? LIMIT 1'); $rf->execute([$referrerId]); $ref = $rf->fetch();
+            $refName = trim((string)($ref['name'] ?? ''));
+            $refTotal = max(0, (int)($ref['points'] ?? 0));
+            $msg = 'Halo makasih ya ' . ($refName !== '' ? $refName : 'Member') . ', udah ajak temen kamu belanja di Vapekong! Poin kamu bertambah ' . $points . ' poin. Sekarang total poin kamu ' . $refTotal . '. Yuk ajakin temen kamu yang lain!';
+            wa_send_fonnte($db, $phone, $msg, $transactionId);
+        }
+    } catch (Throwable $e) {
+        // jangan gagalkan status pembayaran karena notif WA gagal
+    }
 }
 
 $id = (int)($_GET['id'] ?? 0);
