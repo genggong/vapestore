@@ -45,7 +45,6 @@ require __DIR__ . '/_header.php';
 
     <form id="marketplaceCheckoutForm" class="store-container checkout-page-grid" autocomplete="on"
           data-region-url="<?= e(base_url('store/api/region-options.php')); ?>"
-          data-dest-url="<?= e(base_url('store/api/destination-search.php')); ?>"
           data-resolve-url="<?= e(base_url('store/api/resolve-destination.php')); ?>"
           data-shipping-url="<?= e(base_url('store/api/shipping-cost.php')); ?>"
           data-pickup-url="<?= e(base_url('store/api/pickup-options.php')); ?>"
@@ -97,13 +96,14 @@ require __DIR__ . '/_header.php';
                     <label class="delivery-only">Kode Pos<input type="text" name="postal_code" id="postalCode" inputmode="numeric" maxlength="10" placeholder="Otomatis / isi manual"></label>
                     <label class="span-2 delivery-only">Alamat Lengkap<textarea name="address" required minlength="8" rows="3" placeholder="Nama jalan, nomor rumah, RT/RW, patokan..."></textarea></label>
                     <div class="span-2 checkout-region-block delivery-only">
-                        <div class="checkout-region-head"><div><b><i class="bi bi-pin-map-fill"></i> Wilayah Pengiriman</b><small>Ketik minimal 3 huruf (kelurahan/kecamatan/kota), lalu pilih dari hasil.</small></div><span id="regionLoading" hidden><i class="bi bi-arrow-repeat"></i> Memuat</span></div>
-                        <label class="dst-autocomplete-label">
-                            <input type="text" id="destinationAutocomplete" class="dst-autocomplete-input" autocomplete="off" placeholder="Ketik nama kelurahan / kecamatan / kota..." aria-label="Cari wilayah pengiriman" aria-expanded="false" role="combobox">
-                            <select id="destinationAutocompleteSelect" class="dst-autocomplete-src" tabindex="-1" aria-hidden="true"><option value=""></option></select>
-                            <span id="dstAutocompleteDropdown" class="dst-autocomplete-dropdown" hidden role="listbox"></span>
-                        </label>
-                        <div class="checkout-region-help" id="regionStatus"><i class="bi bi-info-circle"></i><span>Ketik nama wilayah, minimal 3 huruf.</span></div>
+                        <div class="checkout-region-head"><div><b><i class="bi bi-pin-map-fill"></i> Wilayah Pengiriman</b><small>Pilih berurutan agar ongkir dihitung otomatis.</small></div><span id="regionLoading" hidden><i class="bi bi-arrow-repeat"></i> Memuat</span></div>
+                        <div class="checkout-region-grid">
+                            <label>Provinsi<select id="destinationProvinceSelect" required><option value="">Pilih Provinsi</option></select></label>
+                            <label>Kota / Kabupaten<select id="destinationCitySelect" required disabled><option value="">Pilih Kota/Kabupaten</option></select></label>
+                            <label>Kecamatan<select id="destinationDistrictSelect" required disabled><option value="">Pilih Kecamatan</option></select></label>
+                            <label>Kelurahan / Desa<select id="destinationSubdistrictSelect" required disabled><option value="">Pilih Kelurahan/Desa</option></select></label>
+                        </div>
+                        <div class="checkout-region-help" id="regionStatus"><i class="bi bi-info-circle"></i><span>Pilih Provinsi terlebih dahulu.</span></div>
                     </div>
                     <div class="span-2 destination-selected delivery-only" id="destinationSelected" hidden>
                         <i class="bi bi-geo-alt-fill"></i><div><b id="destinationSelectedLabel"></b><small id="destinationSelectedMeta"></small></div><button type="button" id="destinationChange">Ganti Wilayah</button>
@@ -191,5 +191,5 @@ require __DIR__ . '/_header.php';
         </aside>
     </form>
 </main>
-<script src="<?= base_url('assets/js/marketplace-checkout.js?v=17.0.78'); ?>"></script>
+<script src="<?= base_url('assets/js/marketplace-checkout.js?v=17.0.79'); ?>"></script>
 <?php require __DIR__ . '/_footer.php'; ?>
