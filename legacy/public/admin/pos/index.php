@@ -493,6 +493,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('Token keamanan tidak valid. Refresh halaman POS lalu coba lagi.');
         }
 
+        if (($_POST['pos_action'] ?? '') === 'quick_member_create') {
+            header('Content-Type: application/json; charset=utf-8');
+            $name = trim((string) ($_POST['quick_member_name'] ?? ''));
+            $phone = trim((string) ($_POST['quick_member_phone'] ?? ''));
+            if ($name === '') throw new Exception('Nama member wajib diisi.');
+            if ($phone === '') throw new Exception('Nomor HP member wajib diisi.');
+            $normalizedPhone = pos_theme_normalize_phone($phone);
+            $existing = pos_theme_find_customer_by_phone($db, $phone);
+            if ($existing) throw new Exception('Nomor HP sudah terdaftar sebagai member: ' . $existing['name']);
+            $memberCode = 'MBR' . date('ymdHis') . random_int(10, 99);
+            $stmt = $db->prepare("INSERT INTO customers (name, phone, member_code, member_level, price_level, points, credit_limit, status, created_at) VALUES (?, ?, ?, 'regular', 'retail', 0, 0, 'active', NOW())");
+            $stmt->execute([$name, $phone, $memberCode]);
+            echo json_encode(['ok' => true, 'customer' => ['id' => (int) $db->lastInsertId(), 'name' => $name, 'phone' => $phone, 'member_code' => $memberCode, 'points' => 0, 'price_level' => 'retail']]);
+            exit;
+        }
+
         $cart = json_decode($_POST['cart_json'] ?? '[]', true);
         if (!is_array($cart) || count($cart) < 1) {
             throw new Exception('Keranjang masih kosong. Pilih produk dulu.');
@@ -1009,6 +1025,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($db->inTransaction()) {
             $db->rollBack();
         }
+        if (($_POST['pos_action'] ?? '') === 'quick_member_create') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+            exit;
+        }
         $errorMessage = $e->getMessage();
     }
 }
@@ -1269,7 +1290,7 @@ a.pos-member-add-link {
                 <div class="member-box-theme">
                     <div class="member-label-row-theme">
                         <label class="mini-label">Member Pelanggan</label>
-                        <a href="<?= base_url('admin/customers/create.php'); ?>" class="member-add-link-theme pos-member-add-link"><i class="bi bi-person-plus"></i> Tambah Member</a>
+                        <button type="button" id="quickMemberTheme" class="member-add-link-theme pos-member-add-link"><i class="bi bi-person-plus"></i> Member Cepat</button>
                     </div>
                     <div class="member-search-picker" id="memberSearchPickerTheme">
                         <div class="member-search-input-wrap">
@@ -1292,18 +1313,21 @@ a.pos-member-add-link {
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="member-referral-field-theme">
-                        <label class="mini-label" for="referrerMemberTheme">Pengajak <span>(Pelanggan Lama / Referrer)</span></label>
-                        <select name="referrer_customer_id" id="referrerMemberTheme">
-                            <option value="" data-referrer-phone="">Pilih member pengajak...</option>
-                            <?php foreach ($customers as $referrerOption): ?>
-                                <option value="<?= e($referrerOption['id']); ?>" data-referrer-phone="<?= e($referrerOption['phone'] ?? ''); ?>" data-referrer-name="<?= e($referrerOption['name']); ?>">
-                                    <?= e($referrerOption['name']); ?><?= !empty($referrerOption['phone']) ? ' — ' . e($referrerOption['phone']) : ''; ?>
-                                </option>
-                            <?php endforeach; ?>
+                    <div class="member-referral-field-theme" id="referrerPickerTheme">
+                        <label class="mini-label" for="referrerSearchTheme">Pengajak <span>(Pelanggan Lama / Referrer)</span></label>
+                        <div class="member-search-picker">
+                            <div class="member-search-input-wrap">
+                                <i class="bi bi-person-check"></i>
+                                <input type="search" id="referrerSearchTheme" autocomplete="off" placeholder="Cari nama / nomor HP pengajak..." aria-controls="referrerSearchResultsTheme">
+                                <button type="button" id="referrerClearTheme" class="member-clear-btn" title="Hapus pengajak"><i class="bi bi-x-lg"></i></button>
+                            </div>
+                            <div class="member-search-results" id="referrerSearchResultsTheme" hidden></div>
+                        </div>
+                        <select name="referrer_customer_id" id="referrerMemberTheme" class="member-hidden-select" aria-hidden="true" tabindex="-1"><option value="" data-referrer-phone="">Pilih member pengajak...</option>
+                            <?php foreach ($customers as $referrerOption): ?><option value="<?= e($referrerOption['id']); ?>" data-referrer-phone="<?= e($referrerOption['phone'] ?? ''); ?>" data-referrer-name="<?= e($referrerOption['name']); ?>"><?= e($referrerOption['name']); ?> — <?= e($referrerOption['phone'] ?? '-'); ?></option><?php endforeach; ?>
                         </select>
                         <input type="hidden" name="referrer_phone" id="referrerPhoneTheme" value="">
-                        <small id="referrerInfoTheme">Pilih nama member lama yang mengajak Customer Baru. Referral hanya berlaku pada transaksi pertama dan pengajak mendapat 50% poin reguler.</small>
+                        <small id="referrerInfoTheme">Cari lalu pilih nama member lama. Referral hanya berlaku pada transaksi pertama.</small>
                     </div>
                     <?php if ($customerLoadError !== ''): ?>
                         <small class="member-empty-note pos-member-error"><i class="bi bi-exclamation-triangle-fill"></i> Gagal memuat daftar member: <?= e($customerLoadError); ?> — buka menu System Upgrade lalu muat ulang halaman ini.</small>
@@ -1314,6 +1338,18 @@ a.pos-member-add-link {
                             <small class="member-rule-theme">Reward: 1 poin / <?= rupiah($memberEarnRate); ?> belanja • Nilai poin: <?= rupiah($memberPointValue); ?>/poin</small>
                         </div>
                         <input type="number" name="redeem_points" id="redeemPointsTheme" min="0" value="0" placeholder="Tukar poin">
+                    </div>
+                </div>
+
+                <div class="quick-member-modal" id="quickMemberModalTheme" hidden>
+                    <div class="quick-member-card">
+                        <button type="button" class="member-clear-btn quick-member-close" id="quickMemberCloseTheme"><i class="bi bi-x-lg"></i></button>
+                        <h4><i class="bi bi-person-plus"></i> Member Cepat</h4>
+                        <p>Daftarkan member tanpa meninggalkan transaksi POS.</p>
+                        <label>Nama Member<input type="text" id="quickMemberNameTheme" autocomplete="name"></label>
+                        <label>Nomor HP<input type="tel" id="quickMemberPhoneTheme" inputmode="tel" autocomplete="tel" placeholder="08xxxxxxxxxx"></label>
+                        <div class="quick-member-actions"><button type="button" class="member-add-link-theme" id="quickMemberCancelTheme">Batal</button><button type="button" class="member-add-link-theme quick-member-save" id="quickMemberSaveTheme">Simpan & Pilih</button></div>
+                        <small id="quickMemberStatusTheme"></small>
                     </div>
                 </div>
 
@@ -1492,7 +1528,8 @@ a.pos-member-add-link {
 
 <style>
 .pos-theme-alert{margin:16px 20px;padding:14px 16px;border-radius:16px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;display:flex;gap:12px;align-items:flex-start}.pos-theme-alert i{font-size:22px}.pos-theme-alert b{display:block}.pos-theme-alert span{display:block;color:#7f1d1d}.cart-item-info small{display:block;color:#64748b;margin-top:4px}.pos-product-img img{width:100%;height:100%;object-fit:cover}.pos-product-card{position:relative}.pos-input{width:100%}.qris-info-box{margin:16px 0 18px;border:1px solid #fecaca;background:#fff7f7;border-radius:18px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;color:#7f1d1d}.qris-info-box i{font-size:24px;color:#991b1b}.qris-info-box b{display:block;color:#991b1b}.qris-info-box span{display:block;color:#7f1d1d;font-size:14px;line-height:1.55;margin-top:4px}.qty-control input::-webkit-outer-spin-button,.qty-control input::-webkit-inner-spin-button{appearance:none;margin:0}.member-box-theme{margin:0 0 16px;padding:14px;border:1px solid #fee2e2;background:#fff7f7;border-radius:20px}.member-redeem-row{display:grid;grid-template-columns:1fr 120px;gap:10px;align-items:center;margin-top:10px}.member-redeem-row small{display:block;color:#7f1d1d;font-weight:700;line-height:1.4}.member-rule-theme{opacity:.78}.member-redeem-row input{width:100%;border:1px solid #fecaca;border-radius:14px;padding:10px 12px;font-weight:800;text-align:right}.member-point-line b{color:#991b1b}.pos-debt-presets{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}.pos-debt-presets button{border:1px solid #fecaca;background:#fff;color:#991b1b;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer}.pos-debt-presets button:hover,.pos-debt-presets button.active{background:#991b1b;color:#fff;border-color:#991b1b}@media(max-width:720px){.member-redeem-row{grid-template-columns:1fr}.member-redeem-row input{text-align:left}.pos-debt-presets button{flex:1}}
-.member-hidden-select{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;border:0!important;padding:0!important;margin:-1px!important}.member-search-picker{position:relative;margin-top:2px}.member-search-input-wrap{display:flex;align-items:center;gap:9px;background:#fff;border:2px solid #e9b8ff;border-radius:18px;padding:0 12px;box-shadow:0 0 0 6px rgba(168,85,247,.08)}.member-search-input-wrap>i{color:#7e22ce;font-size:18px}.member-search-input-wrap input{flex:1;min-width:0;border:0;outline:0;background:transparent;padding:14px 0;font-weight:800;font-size:15px;color:#111827}.member-clear-btn{border:0;background:#fdf2f8;color:#991b1b;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;cursor:pointer}.member-search-results{margin-top:9px;background:#fff;border:1px solid #e9d5ff;border-radius:16px;max-height:280px;overflow:auto;box-shadow:0 18px 44px rgba(88,28,135,.15);padding:6px}.member-result-btn{width:100%;border:0;background:#fff;text-align:left;border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:12px;align-items:center;cursor:pointer}.member-result-btn:hover,.member-result-btn:focus{background:#faf5ff;outline:2px solid #d8b4fe}.member-result-main{min-width:0}.member-result-main b{display:block;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.member-result-main small{display:block;color:#64748b;margin-top:2px}.member-result-points{white-space:nowrap;color:#7e22ce;font-weight:900;font-size:12px}.member-search-empty,.member-search-more{padding:11px 12px;color:#64748b;font-size:13px}.member-empty-note{display:block;margin-top:8px;color:#64748b}.manual-qris-box{margin:16px 0 18px;border:1px solid #d8b4fe;background:#faf5ff;border-radius:20px;padding:14px}.manual-qris-head{display:flex;gap:10px;align-items:flex-start;color:#581c87}.manual-qris-head i{font-size:24px}.manual-qris-head b{display:block;font-weight:900}.manual-qris-head span{display:block;color:#6b21a8;font-size:13px;line-height:1.45;margin-top:3px}.manual-qris-box img{display:block;width:min(290px,100%);aspect-ratio:1/1;object-fit:contain;margin:14px auto;background:#fff;border:1px solid #e9d5ff;border-radius:18px;padding:10px}.manual-qris-confirm{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid #e9d5ff;border-radius:14px;padding:12px;font-weight:800;color:#581c87;cursor:pointer}.manual-qris-confirm input{width:20px;height:20px;flex:0 0 auto}@media(max-width:720px){.member-search-input-wrap input{font-size:14px}.member-search-results{max-height:235px}.member-result-btn{padding:11px 10px}.manual-qris-box img{width:min(250px,100%)}}
+.member-hidden-select{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;border:0!important;padding:0!important;margin:-1px!important}.member-search-picker{position:relative;margin-top:2px}.member-search-input-wrap{display:flex;align-items:center;gap:9px;background:#fff;border:2px solid #e9b8ff;border-radius:18px;padding:0 12px;box-shadow:0 0 0 6px rgba(168,85,247,.08)}.member-search-input-wrap>i{color:#7e22ce;font-size:18px}.member-search-input-wrap input{flex:1;min-width:0;border:0;outline:0;background:transparent;padding:14px 0;font-weight:800;font-size:15px;color:#111827}.member-clear-btn{border:0;background:#fdf2f8;color:#991b1b;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;cursor:pointer}.member-search-results{margin-top:9px;background:#fff;border:1px solid #e9d5ff;border-radius:16px;max-height:280px;overflow:auto;box-shadow:0 18px 44px rgba(88,28,135,.15);padding:6px}.member-result-btn{width:100%;border:0;background:#fff;text-align:left;border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:12px;align-items:center;cursor:pointer}.member-result-btn:hover,.member-result-btn:focus{background:#faf5ff;outline:2px solid #d8b4fe}.member-result-main{min-width:0}.member-result-main b{display:block;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.member-result-main small{display:block;color:#64748b;margin-top:2px}.member-result-points{white-space:nowrap;color:#7e22ce;font-weight:900;font-size:12px}.member-search-empty,.member-search-more{padding:11px 12px;color:#64748b;font-size:13px}.member-empty-note{display:block;margin-top:8px;color:#64748b}.manual-qris-box{margin:16px 0 18px;border:1px solid #d8b4fe;background:#faf5ff;border-radius:20px;padding:14px}.manual-qris-head{display:flex;gap:10px;align-items:flex-start;color:#581c87}.manual-qris-head i{font-size:24px}.manual-qris-head b{display:block;font-weight:900}.manual-qris-head span{display:block;color:#6b21a8;font-size:13px;line-height:1.45;margin-top:3px}.manual-qris-box img{display:block;width:min(290px,100%);aspect-ratio:1/1;object-fit:contain;margin:14px auto;background:#fff;border:1px solid #e9d5ff;border-radius:18px;padding:10px}.manual-qris-confirm{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid #e9d5ff;border-radius:14px;padding:12px;font-weight:800;color:#581c87;cursor:pointer}.manual-qris-confirm input{width:20px;height:20px;flex:0 0 auto}.quick-member-modal{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.5);display:grid;place-items:center;padding:20px}.quick-member-modal[hidden]{display:none}.quick-member-card{position:relative;background:#fff;border-radius:20px;padding:22px;width:min(430px,100%);box-shadow:0 24px 70px rgba(15,23,42,.28)}.quick-member-card h4{margin:0;color:#581c87;font-size:20px}.quick-member-card p{margin:6px 0 18px;color:#64748b}.quick-member-card label{display:block;font-weight:800;color:#374151;margin-top:12px}.quick-member-card input{display:block;width:100%;box-sizing:border-box;margin-top:6px;border:1px solid #d8b4fe;border-radius:12px;padding:11px}.quick-member-close{position:absolute;right:14px;top:14px}.quick-member-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.quick-member-save{background:#7e22ce!important;color:#fff!important}.quick-member-card small{display:block;margin-top:10px;color:#b91c1c}
+ @media(max-width:720px){.member-search-input-wrap input{font-size:14px}.member-search-results{max-height:235px}.member-result-btn{padding:11px 10px}.manual-qris-box img{width:min(250px,100%)}}
 
 </style>
 
@@ -1703,6 +1740,15 @@ if (typeof window.Html5Qrcode === 'undefined') {
         phone.value = opt?.dataset.referrerPhone || '';
         if(info && phone.value) info.textContent = 'Pengajak terpilih: ' + (opt.dataset.referrerName || opt.textContent.trim()) + '. Mendapat 50% dari poin reguler Customer Baru.';
     }
+
+    function renderReferrerSearchResults(query=''){
+        const box=qs('#referrerSearchResultsTheme'), select=qs('#referrerMemberTheme'); if(!box||!select)return;
+        const q=String(query||'').trim().toLowerCase(), digits=q.replace(/\D/g,'');
+        const matches=Array.from(select.options).filter(o=>o.value).map(o=>{const name=(o.dataset.referrerName||'').toLowerCase(), phone=(o.dataset.referrerPhone||'').replace(/\D/g,''); return {o,ok:!q||name.includes(q)||phone.includes(digits),score:name===q?100:(name.startsWith(q)?70:(phone.endsWith(digits)&&digits?80:20))};}).filter(x=>x.ok).sort((a,b)=>b.score-a.score).slice(0,12);
+        box.innerHTML=matches.length?matches.map(x=>'<button type="button" class="member-result-btn" data-referrer-id="'+esc(x.o.value)+'"><span class="member-result-main"><b>'+esc(x.o.dataset.referrerName)+'</b><small>'+esc(x.o.dataset.referrerPhone||'-')+'</small></span></button>').join(''):'<div class="member-search-empty">Member pengajak tidak ditemukan.</div>'; box.hidden=false;
+    }
+    function chooseReferrer(id){const s=qs('#referrerMemberTheme'),i=qs('#referrerSearchTheme'),p=qs('#referrerPhoneTheme'),o=s?.querySelector('option[value="'+CSS.escape(String(id||''))+'"]'); if(!s)return; s.value=id||''; p.value=o?.dataset.referrerPhone||''; i.value=o?(o.dataset.referrerName+' — '+(o.dataset.referrerPhone||'')):''; qs('#referrerSearchResultsTheme').hidden=true;}
+    async function saveQuickMember(){const name=qs('#quickMemberNameTheme').value.trim(),phone=qs('#quickMemberPhoneTheme').value.trim(),status=qs('#quickMemberStatusTheme'); if(!name||!phone){status.textContent='Nama dan nomor HP wajib diisi.';return;} const fd=new FormData(qs('#checkoutFormTheme')); fd.set('pos_action','quick_member_create'); fd.set('quick_member_name',name); fd.set('quick_member_phone',phone); status.textContent='Menyimpan...'; try{const r=await fetch(location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});const data=await r.json();if(!data.ok)throw new Error(data.error||'Gagal menyimpan'); const c=data.customer,s=qs('#customerTheme'); const o=new Option(c.name+' - '+c.phone+' • 0 poin',c.id,true,true); o.dataset.name=c.name;o.dataset.phone=c.phone;o.dataset.code=c.member_code;o.dataset.points='0';o.dataset.priceLevel='retail';s.add(o); chooseMember(c.id); qs('#quickMemberModalTheme').hidden=true; qs('#quickMemberNameTheme').value='';qs('#quickMemberPhoneTheme').value=''; updateTotals(); }catch(e){status.textContent=e.message;}}
 
     function formatLocalDate(date){
         const year = date.getFullYear();
@@ -2158,6 +2204,14 @@ if (typeof window.Html5Qrcode === 'undefined') {
     }
 
     document.addEventListener('click', function(e){
+        const referrerResult = e.target.closest('[data-referrer-id]');
+        if(referrerResult){ e.preventDefault(); chooseReferrer(referrerResult.dataset.referrerId); return; }
+        if(e.target.closest('#quickMemberTheme')){ e.preventDefault(); qs('#quickMemberModalTheme').hidden=false; qs('#quickMemberNameTheme').focus(); return; }
+        if(e.target.closest('#quickMemberCloseTheme,#quickMemberCancelTheme')){ e.preventDefault(); qs('#quickMemberModalTheme').hidden=true; return; }
+        if(e.target.closest('#quickMemberSaveTheme')){ e.preventDefault(); saveQuickMember(); return; }
+        if(e.target.closest('#referrerClearTheme')){ e.preventDefault(); chooseReferrer(''); qs('#referrerSearchTheme').focus(); return; }
+        const refPicker=qs('#referrerPickerTheme'), refBox=qs('#referrerSearchResultsTheme');
+        if(refBox && refPicker && !refPicker.contains(e.target)) refBox.hidden=true;
         const memberResult = e.target.closest('[data-member-id]');
         if(memberResult){ e.preventDefault(); chooseMember(memberResult.dataset.memberId); return; }
         if(e.target.closest('#memberClearTheme')){ e.preventDefault(); clearMemberSelection(); return; }
@@ -2186,6 +2240,7 @@ if (typeof window.Html5Qrcode === 'undefined') {
     });
 
     document.addEventListener('input', function(e){
+        if(e.target.matches('#referrerSearchTheme')) renderReferrerSearchResults(e.target.value);
         if(e.target.matches('#memberSearchTheme')){
             const select = qs('#customerTheme');
             if(select && e.target.dataset.selectedId){

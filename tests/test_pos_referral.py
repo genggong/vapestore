@@ -20,6 +20,8 @@ for variant in VARIANTS:
     check(f'{variant}: referral phone input', 'referrer_phone' in text)
     check(f'{variant}: referral member dropdown', 'id="referrerMemberTheme"' in text and 'referrer_customer' in text)
     check(f'{variant}: referral displays member name', 'data-referrer-name' in text)
+    check(f'{variant}: referral search bar', 'referrerSearchTheme' in text and 'referrerSearchResultsTheme' in text)
+    check(f'{variant}: quick member', 'quick_member_create' in text and 'quickMemberTheme' in text)
     check(f'{variant}: referral table', 'customer_referrals' in text)
     check(f'{variant}: first-transaction guard', 'Referral hanya berlaku pada transaksi pertama' in text)
     check(f'{variant}: missing referrer rejected', 'Nomor HP Pengajak tidak ditemukan' in text)
@@ -37,9 +39,9 @@ for variant in VARIANTS:
 source = (ROOT / 'public/admin/pos/index.php').read_text()
 check('unique referral per referred customer', 'UNIQUE KEY customer_referrals_referred_unique (referred_customer_id)' in source)
 check('referral points idempotency', 'customer_points' in source and 'Poin referral:' in source)
-check('VERSION == 17.0.70', (ROOT / 'VERSION').read_text().strip() == '17.0.70')
+check('VERSION == 17.0.71', (ROOT / 'VERSION').read_text().strip() == '17.0.71')
 
-zip_path = ROOT / 'patch/v17.0.70/PATCH_v17.0.70.zip'
+zip_path = ROOT / 'patch/v17.0.71/PATCH_v17.0.71.zip'
 check('release zip exists', zip_path.exists())
 if zip_path.exists():
     expected = [f'{v}/admin/pos/index.php' for v in VARIANTS] + [f'{v}/admin/pakasir/status.php' for v in VARIANTS] + ['VERSION']
