@@ -191,5 +191,5 @@ require __DIR__ . '/_header.php';
         </aside>
     </form>
 </main>
-<script src="<?= legacy_base_url('assets/js/marketplace-checkout.js?v=17.0.75'); ?>"></script>
+<script src="<?= legacy_base_url('assets/js/marketplace-checkout.js?v=17.0.76'); ?>"></script>
 <?php require __DIR__ . '/_footer.php'; ?>

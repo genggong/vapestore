@@ -25,7 +25,7 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 } catch (Throwable $e) {}
 
-$customers = $db->query("SELECT * FROM customers ORDER BY id DESC")->fetchAll();
+$customers = $db->query("SELECT c.*, (SELECT COUNT(*) FROM customer_referrals cr WHERE cr.referrer_customer_id = c.id) AS total_referral FROM customers c ORDER BY c.id DESC")->fetchAll();
 $total = count($customers);
 $active = count(array_filter($customers, fn($c) => ($c['status'] ?? '') === 'active'));
 $totalPoints = array_sum(array_map(fn($c) => (int)$c['points'], $customers));
@@ -77,6 +77,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
                         <th>Kode Member</th>
                         <th>Level</th>
                         <th>Poin</th>
+                        <th>Referral</th>
                         <th>Limit Piutang</th>
                         <th>Status</th>
                         <th>Aksi</th>
@@ -101,6 +102,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
                         <td><span class="customer-badge blue"><?= e($c['member_code'] ?: '-'); ?></span></td>
                         <td><span class="customer-badge orange"><?= e(strtoupper($c['member_level'])); ?></span></td>
                         <td><b><?= e($c['points']); ?></b></td>
+                        <td><span class="customer-badge <?= (int)($c['total_referral'] ?? 0) > 0 ? 'purple' : 'gray'; ?>"><?= (int)($c['total_referral'] ?? 0); ?></span></td>
                         <td><?= rupiah($c['credit_limit']); ?></td>
                         <td>
                             <?php if ($c['status'] === 'active'): ?>

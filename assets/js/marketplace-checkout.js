@@ -97,10 +97,40 @@
           if (!row) return;
           destClose();
           if (destInput) destInput.value = row.label || row.subdistrict || '';
-          setRegionStatus('Wilayah terpilih. Tarif pengiriman sedang dihitung.', 'success');
-          chooseDestination({ id, label: row.label || row.subdistrict || '', province: row.province || '', city: row.city || '', district: row.district || '', subdistrict: row.subdistrict || '', zip_code: row.zip_code || '' });
+          resolveChosenDestination(row);
         });
       });
+    }
+
+    // V17.0.76: lewatkan resolve-destination.php agar id cocok dgn DB kurir toko
+    // (tanpa langkah ini opsi "Kurir Toko" tidak muncul).
+    async function resolveChosenDestination(row) {
+      setRegionBusy(true);
+      setRegionStatus('Memvalidasi wilayah tujuan...', '');
+      try {
+        const params = new URLSearchParams({
+          province: row.province || '', city: row.city || '', district: row.district || '', subdistrict: row.subdistrict || '',
+          zip_code: row.zip_code || ''
+        });
+        const res = await fetch(`${form.dataset.resolveUrl}?${params.toString()}`, {credentials:'same-origin', headers:{'Accept':'application/json'}});
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) throw new Error(json.message || 'Wilayah belum dapat dipetakan.');
+        let item = json.data || {};
+        item.province = item.province || row.province || '';
+        item.city = item.city || row.city || '';
+        item.district = item.district || row.district || '';
+        item.subdistrict = item.subdistrict || row.subdistrict || '';
+        item.zip_code = item.zip_code || row.zip_code || '';
+        item.label = item.label || (item.subdistrict || item.label || '');
+        if (destInput) destInput.value = item.label || '';
+        setRegionStatus('Wilayah terpilih. Tarif pengiriman sedang dihitung.', 'success');
+        chooseDestination(item);
+      } catch (err) {
+        clearDestinationState('Pilih wilayah yang valid untuk melihat ongkir.');
+        setRegionStatus(err.message || 'Wilayah belum dapat dipetakan.', 'error');
+      } finally {
+        setRegionBusy(false);
+      }
     }
 
     async function destSearch(q) {

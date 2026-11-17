@@ -645,8 +645,11 @@ function marketplace_http_json(string $url, string $method = 'GET', array $heade
 
     $json = json_decode((string) $raw, true);
     if (!is_array($json)) {
-        try { marketplace_v15_integration_log(Database::connect(),$provider,$event,false,$status,'','','Response bukan JSON'); } catch(Throwable $ignore) {}
-        throw new RuntimeException('Response API bukan JSON yang valid.');
+        $rawSnippet = trim(preg_replace('/\s+/', ' ', (string) $raw));
+        if (strlen($rawSnippet) > 160) $rawSnippet = substr($rawSnippet, 0, 160) . '…';
+        $errDetail = $rawSnippet !== '' ? $rawSnippet : 'respons kosong';
+        try { marketplace_v15_integration_log(Database::connect(),$provider,$event,false,$status,'','','Response bukan JSON: '.$errDetail); } catch(Throwable $ignore) {}
+        throw new RuntimeException('Response API bukan JSON yang valid (' . basename((string)parse_url($url, PHP_URL_PATH)) . '): ' . $errDetail);
     }
 
     if ($status < 200 || $status >= 300) {
