@@ -34,11 +34,7 @@ function casaku_pos_apply_member_referral(PDO $db, array $trx): void
             $rf = $db->prepare('SELECT name, points FROM customers WHERE id=? LIMIT 1'); $rf->execute([$referrerId]); $ref = $rf->fetch();
             $refName = trim((string)($ref['name'] ?? ''));
             $refTotal = max(0, (int)($ref['points'] ?? 0));
-            $tpl = trim((string) setting('pos_referral_wa_message', ''));
-            if ($tpl === '') {
-                $tpl = 'Halo makasih ya {nama}, udah ajak temen kamu belanja di Vapekong! Poin kamu bertambah {poin} poin. Sekarang total poin kamu {total_poin}. Yuk ajakin temen kamu yang lain!';
-            }
-            $msg = str_replace(['{nama}', '{poin}', '{total_poin}'], [$refName !== '' ? $refName : 'Member', (string)$points, (string)$refTotal], $tpl);
+            $msg = 'Halo makasih ya ' . ($refName !== '' ? $refName : 'Member') . ', udah ajak temen kamu belanja di Vapekong! Poin kamu bertambah ' . $points . ' poin. Sekarang total poin kamu ' . $refTotal . '. Yuk ajakin temen kamu yang lain!';
             wa_send_fonnte($db, $phone, $msg, $transactionId);
         }
     } catch (Throwable $e) {

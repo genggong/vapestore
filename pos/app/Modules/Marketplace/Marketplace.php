@@ -645,11 +645,8 @@ function marketplace_http_json(string $url, string $method = 'GET', array $heade
 
     $json = json_decode((string) $raw, true);
     if (!is_array($json)) {
-        $rawSnippet = trim(preg_replace('/\s+/', ' ', (string) $raw));
-        if (strlen($rawSnippet) > 160) $rawSnippet = substr($rawSnippet, 0, 160) . '…';
-        $errDetail = $rawSnippet !== '' ? $rawSnippet : 'respons kosong';
-        try { marketplace_v15_integration_log(Database::connect(),$provider,$event,false,$status,'','','Response bukan JSON: '.$errDetail); } catch(Throwable $ignore) {}
-        throw new RuntimeException('Response API bukan JSON yang valid (' . basename((string)parse_url($url, PHP_URL_PATH)) . '): ' . $errDetail);
+        try { marketplace_v15_integration_log(Database::connect(),$provider,$event,false,$status,'','','Response bukan JSON'); } catch(Throwable $ignore) {}
+        throw new RuntimeException('Response API bukan JSON yang valid.');
     }
 
     if ($status < 200 || $status >= 300) {
@@ -659,6 +656,28 @@ function marketplace_http_json(string $url, string $method = 'GET', array $heade
     }
     try { marketplace_v15_integration_log(Database::connect(),$provider,$event,true,$status); } catch(Throwable $ignore) {}
     return $json;
+}
+
+function marketplace_rajaongkir_parse_label(string $label, string $fallbackZip = '', bool $stripAdminPrefix = false): array
+{
+    // RajaOngkir domestic-destination hanya memberi label gabungan
+    // "SUB, DIST, CITY, PROV, ZIP" — field nama terpisahnya kosong.
+    $parts = array_values(array_filter(array_map('trim', explode(',', $label)), 'strlen'));
+    $zip = $fallbackZip;
+    $last = $parts[count($parts) - 1] ?? '';
+    if (preg_match('/^\d{3,6}$/', $last)) { if ($zip === '') $zip = $last; array_pop($parts); }
+    $parse = static function (string $v) use ($stripAdminPrefix): string {
+        $v = trim($v);
+        if ($stripAdminPrefix) $v = preg_replace('/\b(KOTA|KABUPATEN|KAB\.?|KECAMATAN|KEC\.?|KELURAHAN|DESA)\b/u', '', $v) ?: '';
+        return trim($v);
+    };
+    return [
+        'province'    => $parse($parts[count($parts) - 1] ?? ''),
+        'city'        => $parse($parts[count($parts) - 2] ?? ''),
+        'district'    => $parse($parts[count($parts) - 3] ?? ''),
+        'subdistrict' => $parse($parts[count($parts) - 4] ?? ''),
+        'zip_code'    => $zip,
+    ];
 }
 
 function marketplace_rajaongkir_search(string $search, int $limit = 20, string $apiKeyOverride = ''): array
@@ -681,14 +700,27 @@ function marketplace_rajaongkir_search(string $search, int $limit = 20, string $
     foreach ($rows as $row) {
         $id = (int) ($row['id'] ?? 0);
         if ($id <= 0) continue;
+        $label = trim((string) ($row['label'] ?? ''));
+        $province = trim((string) ($row['province'] ?? ''));
+        $city = trim((string) ($row['city'] ?? ''));
+        $district = trim((string) ($row['district'] ?? ''));
+        $subdistrict = trim((string) ($row['subdistrict'] ?? ''));
+        $zip = trim((string) ($row['zip_code'] ?? ''));
+        // RajaOngkir domestic-destination mengosongkan field nama; parse dari label.
+        if ($province === '' && $city === '' && $district === '' && $subdistrict === '') {
+            $parsed = marketplace_rajaongkir_parse_label($label, $zip);
+            $province = $parsed['province']; $city = $parsed['city'];
+            $district = $parsed['district']; $subdistrict = $parsed['subdistrict'];
+            $zip = $parsed['zip_code'];
+        }
         $out[] = [
             'id' => $id,
-            'label' => trim((string) ($row['label'] ?? '')),
-            'province' => trim((string) ($row['province'] ?? '')),
-            'city' => trim((string) ($row['city'] ?? '')),
-            'district' => trim((string) ($row['district'] ?? '')),
-            'subdistrict' => trim((string) ($row['subdistrict'] ?? '')),
-            'zip_code' => trim((string) ($row['zip_code'] ?? '')),
+            'label' => $label,
+            'province' => $province,
+            'city' => $city,
+            'district' => $district,
+            'subdistrict' => $subdistrict,
+            'zip_code' => $zip,
         ];
     }
     return $out;

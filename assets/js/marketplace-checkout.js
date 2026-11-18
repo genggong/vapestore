@@ -64,6 +64,82 @@
     const regionCache = new Map();
     const regionPending = new Map();
 
+    /* ===== V17.0.75: autocomplete tunggal wilayah (ganti dropdown bertingkat) ===== */
+    const destInput = $('#destinationAutocomplete');
+    const destDropdown = $('#dstAutocompleteDropdown');
+    let destDebounce = null;
+    let destAbort = null;
+
+    const escD = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    function destClose(clearInput = false) {
+      if (destDropdown) destDropdown.hidden = true;
+      if (clearInput && destInput) destInput.value = '';
+    }
+
+    function destRender(rows) {
+      if (!destDropdown) return;
+      if (!rows || !rows.length) {
+        destDropdown.hidden = false;
+        destDropdown.innerHTML = '<div class="dst-empty">Wilayah tidak ditemukan. Coba isi kelurahan / kecamatan / kota lain.</div>';
+        return;
+      }
+      destDropdown.innerHTML = rows.map(r =>
+        `<button type="button" class="dst-option" data-i="${escD(r.id)}">
+           <b>${escD(r.subdistrict || r.label)}</b>
+           <span>${escD([r.district, r.city, r.province].filter(Boolean).join(', '))}${r.zip_code ? ' • ' + escD(r.zip_code) : ''}</span>
+         </button>`).join('');
+      destDropdown.hidden = false;
+      destDropdown.querySelectorAll('.dst-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.i);
+          const row = rows.find(x => Number(x.id) === id);
+          if (!row) return;
+          destClose();
+          if (destInput) destInput.value = row.label || row.subdistrict || '';
+          setRegionStatus('Wilayah terpilih. Tarif pengiriman sedang dihitung.', 'success');
+          chooseDestination({ id, label: row.label || row.subdistrict || '', province: row.province || '', city: row.city || '', district: row.district || '', subdistrict: row.subdistrict || '', zip_code: row.zip_code || '' });
+        });
+      });
+    }
+
+    async function destSearch(q) {
+      if (!q || q.length < 3) { destClose(); setRegionStatus('Isi kelurahan / kecamatan / kota.', 'error'); return; }
+      setRegionBusy(true);
+      if (destAbort) destAbort.abort();
+      destAbort = new AbortController();
+      try {
+        const url = `${form.dataset.destUrl}?q=${encodeURIComponent(q)}`;
+        const res = await fetch(url, { credentials:'same-origin', headers:{'Accept':'application/json'}, cache:'no-store', signal: destAbort.signal });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) throw new Error(json.message || 'Gagal mencari wilayah.');
+        destRender(Array.isArray(json.data) ? json.data : []);
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        destClose(); setRegionStatus(err.message || 'Gagal mencari wilayah.', 'error');
+      } finally {
+        setRegionBusy(false);
+      }
+    }
+
+    if (destInput) {
+      destInput.addEventListener('input', () => {
+        const val = destInput.value.trim();
+        clearTimeout(destDebounce);
+        if (val.length < 3) { destClose(); if (val.length === 0) setRegionStatus('Isi kelurahan / kecamatan / kota.'); return; }
+        destDebounce = setTimeout(() => destSearch(val), 400); // debounce 400ms
+      });
+      destInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { e.preventDefault(); destClose(true); }
+        if (e.key === 'Enter') e.preventDefault();
+      });
+      document.addEventListener('click', e => {
+        if (destDropdown && !e.target.closest('#dstAutocompleteDropdown, #destinationAutocomplete')) destClose();
+      });
+    }
+    const resetAutocomplete = () => { clearTimeout(destDebounce); destClose(true); };
+
+
     const setSubmitLoading = loading => {
       if (!submitBtn) return;
       submitBtn.classList.toggle('loading', loading);
@@ -431,6 +507,7 @@
         const el = $('#' + id); if (el) el.value = '';
       });
       if (selectedBox) selectedBox.hidden = true;
+      if (typeof resetAutocomplete === 'function') resetAutocomplete();
       clearShipping(message);
     };
 

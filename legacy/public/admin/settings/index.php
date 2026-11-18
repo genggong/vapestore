@@ -26,7 +26,7 @@ function pos_qris_upload(array $file): ?string
     return 'uploads/qris/'.$name;
 }
 
-$fields=['app_name','store_name','store_phone','store_email','store_address','receipt_footer','pos_referral_wa_message','currency','timezone','low_stock_alert','maintenance_mode','maintenance_message','qris_manual_enabled','qris_manual_label','member_point_earn_rate','member_point_value','member_point_min_redeem','fonnte_token','fonnte_country_code','fonnte_auto_invoice','fonnte_owner_phone','theme_color'];
+$fields=['app_name','store_name','store_phone','store_email','store_address','receipt_footer','currency','timezone','low_stock_alert','maintenance_mode','maintenance_message','pakasir_project','pakasir_api_key','pakasir_webhook_secret','qris_manual_enabled','qris_manual_label','member_point_earn_rate','member_point_value','member_point_min_redeem','fonnte_token','fonnte_country_code','fonnte_auto_invoice','fonnte_owner_phone','theme_color'];
 if(is_post()){
     if(!CSRF::verify()){ flash('error','Token keamanan tidak valid.'); legacy_redirect('admin/settings/index.php'); }
     try{
@@ -58,7 +58,7 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 <header class="admin-topbar page-topbar"><button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-list"></i></button><div class="topbar-title"><h1>Pengaturan POS</h1><p>Pengaturan kasir, toko fisik, QRIS POS, WhatsApp, poin member, maintenance, dan tema admin.</p></div><div class="topbar-actions"><a class="btn-soft" href="<?= legacy_base_url('admin/marketplace-settings/index.php'); ?>"><i class="bi bi-globe2"></i> Pengaturan Marketplace</a></div></header>
 <section class="system-grid">
 <div class="system-card"><div class="icon"><i class="bi bi-cart-check-fill"></i></div><span>Mode</span><h3>POS / Kasir</h3><p>Terpisah dari website marketplace</p></div>
-
+<div class="system-card"><div class="icon"><i class="bi bi-qr-code"></i></div><span>Pakasir POS</span><h3><?= $v('pakasir_project')!==''?'Terhubung':'Belum Diisi'; ?></h3><p>Khusus pembayaran kasir POS</p></div>
 <div class="system-card"><div class="icon"><i class="bi bi-whatsapp"></i></div><span>WhatsApp</span><h3><?= $v('fonnte_token')!==''?'Aktif':'Belum Diisi'; ?></h3><p>Notifikasi transaksi POS</p></div>
 <div class="system-card"><div class="icon"><i class="bi bi-tools"></i></div><span>Maintenance</span><h3><?= $v('maintenance_mode','off')==='on'?'Aktif':'Nonaktif'; ?></h3><p>Kontrol sistem POS</p></div>
 </section>
@@ -70,9 +70,12 @@ require_once __DIR__ . '/../../layouts/admin-sidebar.php';
 <div class="system-field"><label>Email Toko</label><input type="email" name="store_email" value="<?= e($v('store_email')); ?>"></div>
 <div class="system-field full"><label>Alamat Toko</label><textarea name="store_address"><?= e($v('store_address')); ?></textarea></div>
 <div class="system-field full"><label>Footer Struk</label><textarea name="receipt_footer"><?= e($v('receipt_footer','Terima kasih sudah belanja.')); ?></textarea></div>
-<div class="system-field full"><label>Teks WhatsApp Referral <small>(opsional)</small></label><textarea name="pos_referral_wa_message" placeholder="Contoh: Halo {nama}, makasih udah ajak temen belanja di Vapekong! Poin kamu bertambah {poin}. Sekarang total poin kamu {total_poin}. Yuk ajakin temen kamu yang lain!"><?= e($v('pos_referral_wa_message','')); ?></textarea><small>Gunakan placeholder <b>{nama}</b>, <b>{poin}</b>, <b>{total_poin}</b>. Kosongkan untuk memakai teks default.</small></div>
 
-<div class="marketplace-settings-heading"><h3><i class="bi bi-qr-code"></i> Pembayaran POS</h3><p>Konfigurasi pembayaran kasir/POS.</p></div>
+<div class="marketplace-settings-heading"><h3><i class="bi bi-credit-card"></i> Pembayaran POS</h3><p>Credential ini hanya dipakai transaksi kasir/POS. Marketplace mempunyai credential Pakasir sendiri.</p></div>
+<div class="system-field"><label>Slug Project Pakasir POS</label><input name="pakasir_project" value="<?= e($v('pakasir_project')); ?>" autocomplete="off"></div>
+<div class="system-field"><label>API Key Pakasir POS (v2)</label><input type="password" name="pakasir_api_key" value="<?= e($v('pakasir_api_key')); ?>" autocomplete="off"></div>
+<div class="system-field full"><label>Webhook Secret Pakasir POS (X-Secret)</label><input type="password" name="pakasir_webhook_secret" value="<?= e($v('pakasir_webhook_secret')); ?>" autocomplete="off" placeholder="Secret dari halaman detail project Pakasir"><small>API v2 mengirim header <b>X-Secret</b>. Salin secret dari detail project Pakasir agar webhook dapat diverifikasi.</small></div>
+<div class="system-field full"><label>Webhook Pakasir POS v2</label><input readonly value="<?= e(legacy_base_url('pakasir-webhook.php')); ?>"><small>Pasang URL ini pada project Pakasir POS. Endpoint mendukung payload v2 dan validasi X-Secret.</small></div>
 <div class="system-field"><label>QRIS Manual POS</label><select name="qris_manual_enabled"><option value="off" <?= $v('qris_manual_enabled','off')==='off'?'selected':''; ?>>Nonaktif</option><option value="on" <?= $v('qris_manual_enabled')==='on'?'selected':''; ?>>Aktif</option></select></div>
 <div class="system-field"><label>Nama QRIS Manual</label><input name="qris_manual_label" value="<?= e($v('qris_manual_label','QRIS Toko')); ?>"></div>
 <div class="system-field full"><label>Gambar QRIS Manual</label><input type="file" name="qris_manual_image" accept="image/png,image/jpeg,image/webp"><?php if($v('qris_manual_image')!==''): ?><div style="display:flex;gap:16px;align-items:center;margin-top:12px"><img src="<?= legacy_base_url($v('qris_manual_image')); ?>" style="width:150px;aspect-ratio:1;object-fit:contain;border:1px solid #e2e8f0;border-radius:16px;padding:8px"><label><input type="checkbox" name="qris_manual_remove" value="1"> Lepaskan gambar</label></div><?php endif; ?></div>
