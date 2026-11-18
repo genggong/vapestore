@@ -149,7 +149,7 @@ function payment_method_label(?string $method): string
         'qris' => 'QRIS',
         'qris_pakasir' => 'QRIS Otomatis',
         'qris_manual' => 'QRIS Manual',
-        'qris_casaku' => 'QRIS',
+        'qris_casaku' => 'QRIS Otomatis',
         'transfer' => 'Transfer',
     ];
     return $labels[$method] ?? ($method !== '' ? strtoupper(str_replace('_', ' ', $method)) : '-');

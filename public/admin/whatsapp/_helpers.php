@@ -69,6 +69,8 @@ function wa_clean_note(string $note): string
     $note = preg_replace('/\[PAKASIR_PAYMENT\].*?\[\/PAKASIR_PAYMENT\]/s', '', $note);
     $note = preg_replace('/\[MEMBER_POINTS\].*?\[\/MEMBER_POINTS\]/s', '', $note);
     $note = preg_replace('/\[MANUAL_QRIS\].*?\[\/MANUAL_QRIS\]/s', '', $note);
+    $note = preg_replace('/\[CASAKU_PAYMENT\].*?\[\/CASAKU_PAYMENT\]/s', '', $note);
+    $note = preg_replace('/Pembayaran QRIS CasaKu dibuat\.[^\n]*/i', 'Pembayaran QRIS Otomatis', $note);
     return trim($note);
 }
 

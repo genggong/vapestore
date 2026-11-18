@@ -134,7 +134,7 @@ function accounting_payment_label(string $method): string
         'qris' => 'QRIS',
         'qris_pakasir' => 'QRIS Pakasir',
         'qris_manual' => 'QRIS Manual',
-        'qris_casaku' => 'QRIS',
+        'qris_casaku' => 'QRIS Otomatis',
         'transfer' => 'Transfer Bank',
         'bank_transfer' => 'Transfer Bank',
         'debit' => 'Kartu Debit',
